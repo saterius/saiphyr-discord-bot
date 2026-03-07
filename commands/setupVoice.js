@@ -1,4 +1,9 @@
-const { SlashCommandBuilder, ChannelType, PermissionFlagsBits } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  ChannelType,
+  PermissionFlagsBits,
+  MessageFlags
+} = require("discord.js");
 const fs = require("fs");
 const path = require("path");
 
@@ -20,6 +25,20 @@ module.exports = {
 
   async execute(interaction) {
     const channel = interaction.options.getChannel("channel");
+    const me = interaction.guild.members.me || await interaction.guild.members.fetchMe();
+    const permissionScope = channel.parent || channel;
+    const perms = permissionScope.permissionsFor(me);
+    const canManageChannels = perms?.has(PermissionFlagsBits.ManageChannels);
+    const canMoveMembers = perms?.has(PermissionFlagsBits.MoveMembers);
+
+    if (!canManageChannels || !canMoveMembers) {
+      await interaction.reply({
+        content:
+          "Bot lacks required permissions on this lobby/category: Manage Channels and Move Members.",
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
 
     let data = {};
     try {
@@ -38,7 +57,7 @@ module.exports = {
 
     await interaction.reply({
       content: `Voice lobby set to ${channel}`,
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 };

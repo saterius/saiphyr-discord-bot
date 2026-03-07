@@ -5,30 +5,39 @@ const path = require("path");
 const dataPath = path.join(__dirname, "../data/voiceChannels.json");
 
 module.exports.handleVoiceUpdate = async (oldState, newState) => {
+  if (!fs.existsSync(dataPath)) return;
 
-  if (!fs.existsSync(dataPath)) return
   const data = JSON.parse(fs.readFileSync(dataPath, "utf8"));
-  const lobbyChannel = data[newState.guild.id];
+  const guild = newState.guild;
+  const lobbyChannelId = data[guild.id];
+  if (!lobbyChannelId) return;
 
-  if (!lobbyChannel) return;
+  const lobby = guild.channels.cache.get(lobbyChannelId);
+  if (!lobby) return;
 
-  // เมื่อมีคนเข้าห้องสร้างห้อง
-  if (newState.channelId === lobbyChannel && oldState.channelId !== lobbyChannel) {
+  const permissionScope = lobby.parent || lobby;
+  const me = guild.members.me || await guild.members.fetchMe();
 
-    const guild = newState.guild;
+  if (newState.channelId === lobbyChannelId && oldState.channelId !== lobbyChannelId) {
+    const scopePerms = permissionScope.permissionsFor(me);
+    const canManageChannels = scopePerms?.has(PermissionFlagsBits.ManageChannels);
+    const canMoveMembers = scopePerms?.has(PermissionFlagsBits.MoveMembers);
+
+    if (!canManageChannels || !canMoveMembers) {
+      console.error(
+        `[voiceRoomService] Missing permissions in guild ${guild.id}: ManageChannels=${Boolean(canManageChannels)}, MoveMembers=${Boolean(canMoveMembers)}.`
+      );
+      return;
+    }
 
     const channel = await guild.channels.create({
       name: `${newState.member.user.username}'s Room`,
       type: ChannelType.GuildVoice,
-      parent: newState.channel.parent,
-
+      parent: lobby.parent,
       permissionOverwrites: [
         {
           id: guild.roles.everyone.id,
-          allow: [
-            PermissionFlagsBits.ViewChannel,
-            PermissionFlagsBits.Connect
-          ]
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect]
         },
         {
           id: newState.member.id,
@@ -45,27 +54,30 @@ module.exports.handleVoiceUpdate = async (oldState, newState) => {
     await newState.member.voice.setChannel(channel);
   }
 
-  /// ลบห้องเมื่อว่าง (เฉพาะ category ของ lobby)
   if (oldState.channel) {
-
-    const lobby = oldState.guild.channels.cache.get(lobbyChannel)
-
-    if (!lobby) return
-
-    const lobbyCategory = lobby.parentId
+    const lobbyCategory = lobby.parentId;
 
     if (
       oldState.channel.members.size === 0 &&
-      oldState.channel.id !== lobbyChannel &&
+      oldState.channel.id !== lobbyChannelId &&
       oldState.channel.parentId === lobbyCategory
     ) {
+      const canManageChannels = permissionScope
+        .permissionsFor(me)
+        ?.has(PermissionFlagsBits.ManageChannels);
+
+      if (!canManageChannels) {
+        console.error(
+          `[voiceRoomService] Missing ManageChannels to delete empty room in guild ${guild.id}.`
+        );
+        return;
+      }
+
       try {
-        await oldState.channel.delete()
+        await oldState.channel.delete();
       } catch (err) {
-        console.log("Delete channel error:", err)
+        console.log("Delete channel error:", err);
       }
     }
-
   }
-
 };
