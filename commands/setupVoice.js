@@ -17,27 +17,20 @@ module.exports = {
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
-  async execute(interaction) {
+    async execute(interaction) {
 
     const channel = interaction.options.getChannel("channel")
 
-    if (channel.type !== ChannelType.GuildVoice) {
-      return interaction.reply({
-        content: "❌ Please select a voice channel.",
-        ephemeral: true
-      })
-    }
+    // ทำงานกับไฟล์
+    const fs = require("fs")
+    const path = require("path")
 
-    if (!fs.existsSync(dataPath)) {
-      fs.writeFileSync(dataPath, "{}")
-    }
+    const dataPath = path.join(__dirname, "../data/voiceChannels.json")
 
     let data = {}
 
-    try {
-      data = JSON.parse(fs.readFileSync(dataPath, "utf8"))
-    } catch {
-      data = {}
+    if (fs.existsSync(dataPath)) {
+        data = JSON.parse(fs.readFileSync(dataPath))
     }
 
     data[interaction.guild.id] = channel.id
@@ -45,9 +38,9 @@ module.exports = {
     fs.writeFileSync(dataPath, JSON.stringify(data, null, 2))
 
     await interaction.reply({
-      content: `✅ Voice lobby set to ${channel}`,
-      ephemeral: true
+        content: `✅ Voice lobby set to ${channel}`,
+        ephemeral: true
     })
 
-  }
+}
 }
