@@ -1,29 +1,27 @@
+const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
 const fs = require("fs");
 const path = require("path");
 
 const dataPath = path.join(__dirname, "../data/voiceChannels.json");
 
 module.exports = {
-  name: "setup-voice",
+  data: new SlashCommandBuilder()
+    .setName("setup-voice")
+    .setDescription("Set this channel as the voice lobby")
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
 
-    if (!interaction.member.permissions.has("Administrator")) {
-      return interaction.reply({
-        content: "You must be admin to use this command.",
-        ephemeral: true
-      });
-    }
-
-    const channel = interaction.channel;
-
     const data = JSON.parse(fs.readFileSync(dataPath));
 
-    data[interaction.guild.id] = channel.id;
+    data[interaction.guild.id] = interaction.channel.id;
 
     fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
 
-    await interaction.reply(`Lobby voice set to <#${channel.id}>`);
+    await interaction.reply({
+      content: `Voice lobby set to <#${interaction.channel.id}>`,
+      ephemeral: true
+    });
 
   }
 };
