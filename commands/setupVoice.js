@@ -1,27 +1,53 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
-const fs = require("fs");
-const path = require("path");
+const { SlashCommandBuilder, ChannelType, PermissionFlagsBits } = require("discord.js")
+const fs = require("fs")
+const path = require("path")
 
-const dataPath = path.join(__dirname, "../data/voiceChannels.json");
+const dataPath = path.join(__dirname, "../data/voiceChannels.json")
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("setup-voice")
-    .setDescription("Set this channel as the voice lobby")
+    .setDescription("Set a voice channel as the lobby for creating rooms")
+    .addChannelOption(option =>
+      option
+        .setName("channel")
+        .setDescription("Voice channel to use as lobby")
+        .addChannelTypes(ChannelType.GuildVoice)
+        .setRequired(true)
+    )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
 
-    const data = JSON.parse(fs.readFileSync(dataPath));
+    const channel = interaction.options.getChannel("channel")
 
-    data[interaction.guild.id] = interaction.channel.id;
+    if (channel.type !== ChannelType.GuildVoice) {
+      return interaction.reply({
+        content: "❌ Please select a voice channel.",
+        ephemeral: true
+      })
+    }
 
-    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
+    if (!fs.existsSync(dataPath)) {
+      fs.writeFileSync(dataPath, "{}")
+    }
+
+    let data = {}
+
+    try {
+      data = JSON.parse(fs.readFileSync(dataPath, "utf8"))
+    } catch {
+      data = {}
+    }
+
+    data[interaction.guild.id] = channel.id
+
+    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2))
 
     await interaction.reply({
-      content: `Voice lobby set to <#${interaction.channel.id}>`,
+      content: `✅ Voice lobby set to ${channel}`,
       ephemeral: true
-    });
+    })
 
   }
-};
+}
