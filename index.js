@@ -1,28 +1,27 @@
-require("dotenv").config();
+require("dotenv").config()
 
-const { Client, GatewayIntentBits } = require("discord.js");
+const { Client, GatewayIntentBits } = require("discord.js")
+
+const loadCommands = require("./utils/commandLoader")
+const loadEvents = require("./utils/eventLoader")
+const deployCommands = require("./utils/deployCommands")
 
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildVoiceStates
-    ]
-});
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates
+  ]
+})
 
-// Voice room service
-const voiceRoom = require("./services/voiceRoomService");
+loadCommands(client)
+loadEvents(client)
 
-client.on("voiceStateUpdate", (oldState, newState) => {
-  voiceRoom.handleVoiceUpdate(oldState, newState);
-});
+client.once("ready", async () => {
 
-const interactionCreate = require("./events/interactionCreate");
+  console.log(`🚀 Logged in as ${client.user.tag}`)
 
-client.on("interactionCreate", interactionCreate);
+  await deployCommands()
 
-client.once("ready", () => {
+})
 
-    console.log(`Logged in as ${client.user.tag}`);
-});
-
-client.login(process.env.TOKEN);
+client.login(process.env.TOKEN)

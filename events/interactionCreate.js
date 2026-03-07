@@ -13,27 +13,28 @@ for (const file of commandFiles) {
     commands.set(command.data.name, command);
 }
 
-module.exports = async (interaction) => {
+module.exports = async (interaction, client) => {
 
-    if (!interaction.isChatInputCommand()) return;
+  if (!interaction.isChatInputCommand()) return
 
-    const command = commands.get(interaction.commandName);
+  const command = client.commands.get(interaction.commandName)
 
-    if (!command) return;
+  if (!command) return
 
-    try {
+  try {
 
-        await command.execute(interaction);
+    await command.execute(interaction)
 
-    } catch (error) {
+  } catch (error) {
 
-        console.error(error);
+    console.error(error)
 
-        if (interaction.replied || interaction.deferred) {
-            interaction.followUp("Error executing command");
-        } else {
-            interaction.reply("Error executing command");
-        }
-
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp({ content: "Error executing command" })
+    } else {
+      await interaction.reply({ content: "Error executing command" })
     }
+
+  }
+
 };
