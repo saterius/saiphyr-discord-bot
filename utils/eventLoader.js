@@ -9,12 +9,15 @@ module.exports = (client) => {
   for (const file of eventFiles) {
 
     const event = require(path.join(eventsPath, file))
-    const eventName = file.split(".")[0]
 
-    client.on(eventName, (...args) => event(...args, client))
+    if (event.once) {
+      client.once(event.name, (...args) => event.execute(...args, client))
+    } else {
+      client.on(event.name, (...args) => event.execute(...args, client))
+    }
 
   }
-
+  
   console.log(`✅ Loaded ${eventFiles.length} events`)
 
 }

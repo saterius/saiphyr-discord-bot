@@ -6,6 +6,7 @@ const dataPath = path.join(__dirname, "../data/voiceChannels.json");
 
 module.exports.handleVoiceUpdate = async (oldState, newState) => {
 
+  if (!fs.existsSync(dataPath)) return
   const data = JSON.parse(fs.readFileSync(dataPath));
   const lobbyChannel = data[newState.guild.id];
 
@@ -44,17 +45,27 @@ module.exports.handleVoiceUpdate = async (oldState, newState) => {
     await newState.member.voice.setChannel(channel);
   }
 
-  // ลบห้องเมื่อว่าง
-  if (
-    oldState.channel &&
-    oldState.channel.members.size === 0 &&
-    oldState.channel.id !== lobbyChannel
-  ) {
-    try {
-      await oldState.channel.delete();
-    } catch (err) {
-      console.log("Delete channel error:", err);
+  /// ลบห้องเมื่อว่าง (เฉพาะ category ของ lobby)
+  if (oldState.channel) {
+
+    const lobby = oldState.guild.channels.cache.get(lobbyChannel)
+
+    if (!lobby) return
+
+    const lobbyCategory = lobby.parentId
+
+    if (
+      oldState.channel.members.size === 0 &&
+      oldState.channel.id !== lobbyChannel &&
+      oldState.channel.parentId === lobbyCategory
+    ) {
+      try {
+        await oldState.channel.delete()
+      } catch (err) {
+        console.log("Delete channel error:", err)
+      }
     }
+
   }
 
 };
