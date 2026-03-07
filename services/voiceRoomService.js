@@ -1,12 +1,19 @@
-const { ChannelType, PermissionFlagsBits } = require('discord.js');
-const config = require('../config/config.json');
+const { ChannelType, PermissionFlagsBits } = require("discord.js");
+const fs = require("fs");
+const path = require("path");
+
+const dataPath = path.join(__dirname, "../data/voiceChannels.json");
 
 module.exports.handleVoiceUpdate = async (oldState, newState) => {
 
-  if (!config.lobbyChannel) return;
+  const data = JSON.parse(fs.readFileSync(dataPath));
+
+  const lobbyChannel = data[newState.guild.id];
+
+  if (!lobbyChannel) return;
 
   // เมื่อมีคนเข้าห้องสร้างห้อง
-  if (newState.channelId === config.lobbyChannel) {
+  if (newState.channelId === lobbyChannel) {
 
     const guild = newState.guild;
 
@@ -42,7 +49,7 @@ module.exports.handleVoiceUpdate = async (oldState, newState) => {
   if (
     oldState.channel &&
     oldState.channel.members.size === 0 &&
-    oldState.channel.id !== config.lobbyChannel
+    oldState.channel.id !== lobbyChannel
   ) {
     try {
       await oldState.channel.delete();
