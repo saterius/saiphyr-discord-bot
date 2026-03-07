@@ -106,9 +106,14 @@ function leave() {
     }
 }
 
+function getQueue() {
+    return [...queue];
+}
+
 module.exports = {
     play,
     skip,
     stop,
-    leave
+    leave,
+    getQueue
 };
