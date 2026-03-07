@@ -1,9 +1,8 @@
-const voiceRoomService = require('../services/voiceRoomService');
+const { handleVoiceUpdate } = require("../services/voiceRoomService");
 
-module.exports = (client) => {
-
-  client.on('voiceStateUpdate', async (oldState, newState) => {
-    await voiceRoomService.handleVoiceUpdate(oldState, newState);
-  });
-
+module.exports = {
+  name: "voiceStateUpdate",
+  async execute(oldState, newState) {
+    await handleVoiceUpdate(oldState, newState);
+  }
 };

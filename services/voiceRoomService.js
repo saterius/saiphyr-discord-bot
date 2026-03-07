@@ -7,13 +7,12 @@ const dataPath = path.join(__dirname, "../data/voiceChannels.json");
 module.exports.handleVoiceUpdate = async (oldState, newState) => {
 
   const data = JSON.parse(fs.readFileSync(dataPath));
-
   const lobbyChannel = data[newState.guild.id];
 
   if (!lobbyChannel) return;
 
   // เมื่อมีคนเข้าห้องสร้างห้อง
-  if (newState.channelId === lobbyChannel) {
+  if (!oldState.channelId && newState.channelId === lobbyChannel) {
 
     const guild = newState.guild;
 
@@ -53,7 +52,9 @@ module.exports.handleVoiceUpdate = async (oldState, newState) => {
   ) {
     try {
       await oldState.channel.delete();
-    } catch {}
+    } catch (err) {
+      console.log("Delete channel error:", err);
+    }
   }
 
 };
