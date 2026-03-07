@@ -1,39 +1,28 @@
-const fs = require("fs");
-const path = require("path");
+module.exports = {
+  name: "interactionCreate",
 
-const commands = new Map();
+  async execute(interaction, client) {
+    if (!interaction.isChatInputCommand()) return;
 
-const commandFiles = fs
-  .readdirSync(path.join(__dirname, "../commands"))
-  .filter(file => file.endsWith(".js"));
+    const command = client.commands.get(interaction.commandName);
+    if (!command) return;
 
-for (const file of commandFiles) {
-  const command = require(`../commands/${file}`);
-  commands.set(command.data.name, command);
-}
+    try {
+      await command.execute(interaction, client);
+    } catch (error) {
+      console.error(error);
 
-module.exports = async (interaction, client) => {
-
-  if (!interaction.isChatInputCommand()) return;
-
-  const command = commands.get(interaction.commandName);
-
-  if (!command) return;
-
-  try {
-
-    await command.execute(interaction, client);
-
-  } catch (error) {
-
-    console.error(error);
-
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ content: "Error executing command", ephemeral: true });
-    } else {
-      await interaction.reply({ content: "Error executing command", ephemeral: true });
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content: "Error executing command",
+          ephemeral: true
+        });
+      } else {
+        await interaction.reply({
+          content: "Error executing command",
+          ephemeral: true
+        });
+      }
     }
-
   }
-
 };

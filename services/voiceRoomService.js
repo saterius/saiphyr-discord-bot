@@ -7,13 +7,13 @@ const dataPath = path.join(__dirname, "../data/voiceChannels.json");
 module.exports.handleVoiceUpdate = async (oldState, newState) => {
 
   if (!fs.existsSync(dataPath)) return
-  const data = JSON.parse(fs.readFileSync(dataPath));
+  const data = JSON.parse(fs.readFileSync(dataPath, "utf8"));
   const lobbyChannel = data[newState.guild.id];
 
   if (!lobbyChannel) return;
 
   // เมื่อมีคนเข้าห้องสร้างห้อง
-  if (!oldState.channelId && newState.channelId === lobbyChannel) {
+  if (newState.channelId === lobbyChannel && oldState.channelId !== lobbyChannel) {
 
     const guild = newState.guild;
 
