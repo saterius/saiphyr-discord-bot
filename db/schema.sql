@@ -1,0 +1,17 @@
+-- This file is now an index for the split schema files in ./schema.
+-- Apply them in this order when bootstrapping a new Turso/SQLite database:
+--
+-- 01_pragmas.sql
+-- 10_parties.sql
+-- 15_guild_voice_configs.sql
+-- 16_guild_schedule_configs.sql
+-- 20_party_members.sql
+-- 30_party_confirmations.sql
+-- 40_schedule_events.sql
+-- 50_schedule_votes.sql
+-- 60_party_logs.sql
+-- 90_triggers.sql
+-- 95_guild_voice_triggers.sql
+-- 96_guild_schedule_triggers.sql
+--
+-- Keeping the schema split by concern makes it easier to review and maintain.

@@ -1,15 +1,10 @@
 const { ChannelType, PermissionFlagsBits } = require("discord.js");
-const fs = require("fs");
-const path = require("path");
-
-const dataPath = path.join(__dirname, "../data/voiceChannels.json");
+const { getVoiceConfig } = require("./guildConfigService");
 
 module.exports.handleVoiceUpdate = async (oldState, newState) => {
-  if (!fs.existsSync(dataPath)) return;
-
-  const data = JSON.parse(fs.readFileSync(dataPath, "utf8"));
   const guild = newState.guild;
-  const lobbyChannelId = data[guild.id];
+  const voiceConfig = await getVoiceConfig(guild.id);
+  const lobbyChannelId = voiceConfig?.lobby_channel_id;
   if (!lobbyChannelId) return;
 
   const lobby = guild.channels.cache.get(lobbyChannelId);

@@ -5,13 +5,15 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "deploy": "node utils/deployCommands.js"
+    "deploy": "node utils/deployCommands.js",
+    "db:init": "node db/init.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@libsql/client": "^0.15.15",
     "@discordjs/voice": "^0.17.0",
     "@distube/ytdl-core": "^4.16.12",
     "discord.js": "^14.25.1",
