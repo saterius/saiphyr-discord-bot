@@ -1,4 +1,6 @@
 node_modules
 .env
 logs
-data/voiceChannels.json
+*.log
+*.db
+cookies.txt

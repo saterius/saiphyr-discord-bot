@@ -1,10 +1,14 @@
 const { MessageFlags } = require("discord.js");
+const { handleComponentInteraction } = require("./interactionHandlers");
 
 module.exports = {
   name: "interactionCreate",
 
   async execute(interaction, client) {
-    if (!interaction.isChatInputCommand()) return;
+    if (!interaction.isChatInputCommand()) {
+      await handleComponentInteraction(interaction);
+      return;
+    }
 
     const command = client.commands.get(interaction.commandName);
     if (!command) return;

@@ -4,17 +4,17 @@ const {
   PermissionFlagsBits,
   SlashCommandBuilder
 } = require("discord.js");
-const { setVoiceLobby } = require("../services/guildConfigService");
+const { setScheduleBoard } = require("../services/guildConfigService");
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName("setlobby")
-    .setDescription("Set the voice lobby channel for this guild")
+    .setName("setscheduleboard")
+    .setDescription("Set the default schedule board channel for this guild")
     .addChannelOption(option =>
       option
         .setName("channel")
-        .setDescription("Lobby voice channel")
-        .addChannelTypes(ChannelType.GuildVoice)
+        .setDescription("Text channel to use as the schedule board")
+        .addChannelTypes(ChannelType.GuildText)
         .setRequired(true)
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -22,13 +22,13 @@ module.exports = {
   async execute(interaction) {
     const channel = interaction.options.getChannel("channel");
 
-    await setVoiceLobby({
+    await setScheduleBoard({
       guildId: interaction.guildId,
-      lobbyChannelId: channel.id
+      boardChannelId: channel.id
     });
 
     await interaction.reply({
-      content: `Lobby saved for this guild: ${channel}`,
+      content: `Default schedule board saved for this guild: ${channel}`,
       flags: MessageFlags.Ephemeral
     });
   }
