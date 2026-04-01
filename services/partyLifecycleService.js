@@ -41,6 +41,14 @@ async function finishParty({
 
   const party = await partyService.getPartyById(partyId)
 
+  if (["closed", "cancelled"].includes(party.status)) {
+    throw new ServiceError(
+      "ปาร์ตี้นี้ถูกปิดไปแล้ว",
+      "PARTY_ALREADY_FINISHED",
+      { partyId, status: party.status }
+    )
+  }
+
   if (party.guild_id !== guild.id) {
     throw new ServiceError(
       "Party does not belong to this guild.",
