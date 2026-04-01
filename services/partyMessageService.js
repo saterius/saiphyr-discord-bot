@@ -15,6 +15,8 @@ const {
   buildScheduleActionRows,
   buildScheduleBoardOverviewEmbeds,
   buildScheduleCancelledNotice,
+  buildScheduleCompletionNotice,
+  buildScheduleCompletionPromptRows,
   buildScheduleEmbed,
   buildScheduleLockedNotice
 } = require("../utils/partyUi")
@@ -219,12 +221,33 @@ async function sendPartyFinishSuggestion(client, partyId, fallbackChannel = null
   }).catch(() => null)
 }
 
+async function sendScheduleCompletionSuggestion(client, event, fallbackChannel = null) {
+  const channel = await fetchTextChannel(
+    client,
+    event.party_channel_id || event.source_channel_id,
+    fallbackChannel
+  )
+
+  if (!channel || !channel.isTextBased()) {
+    return null
+  }
+
+  return channel.send({
+    content: buildScheduleCompletionNotice(event),
+    components: buildScheduleCompletionPromptRows(event.id),
+    allowedMentions: {
+      users: [event.leader_id]
+    }
+  }).catch(() => null)
+}
+
 module.exports = {
   announceCancelledSchedule,
   postLockedScheduleBoardEntry,
   provisionPartyAndAnnounce,
   refreshPartyRecruitmentMessage,
   refreshScheduleVoteMessage,
+  sendScheduleCompletionSuggestion,
   sendPartyFinishSuggestion,
   sendPartyConfirmationPrompt,
   syncGuildScheduleBoard

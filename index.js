@@ -5,6 +5,7 @@ const { Client, GatewayIntentBits, Partials } = require("discord.js")
 const loadCommands = require("./utils/commandLoader")
 const loadEvents = require("./utils/eventLoader")
 const deployCommands = require("./utils/deployCommands")
+const { startScheduleReminderLoop } = require("./services/scheduleReminderService")
 
 const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
@@ -21,11 +22,10 @@ loadCommands(client)
 loadEvents(client)
 
 client.once("ready", async () => {
-
-  console.log(`🚀 Logged in as ${client.user.tag}`)
+  console.log(`Logged in as ${client.user.tag}`)
 
   await deployCommands()
-
+  startScheduleReminderLoop(client)
 })
 
 client.login(process.env.TOKEN)
