@@ -1,5 +1,6 @@
 const partyService = require("./partyService")
 const scheduleService = require("./scheduleService")
+const { PARTY_TYPE } = require("./partyConstants")
 const { provisionPartyResources } = require("./partyProvisioningService")
 const {
   getScheduleBoardState,
@@ -203,6 +204,11 @@ async function announceCancelledSchedule(client, eventId) {
 
 async function sendPartyFinishSuggestion(client, partyId, fallbackChannel = null) {
   const party = await partyService.getPartyById(partyId)
+
+  if (party.party_type !== PARTY_TYPE.AD_HOC) {
+    return null
+  }
+
   const channel = await fetchTextChannel(client, party.party_channel_id, fallbackChannel)
 
   if (!channel || !channel.isTextBased()) {
