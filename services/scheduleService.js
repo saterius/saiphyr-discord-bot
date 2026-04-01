@@ -8,6 +8,7 @@ const {
 const ServiceError = require("./serviceError")
 const {
   MEMBER_STATUS,
+  PARTY_TYPE,
   PARTY_STATUS,
   SCHEDULE_STATUS,
   SCHEDULE_VOTE
@@ -109,7 +110,10 @@ async function getScheduleEventRecord(executor, eventId) {
         setm.end_at_unix,
         p.guild_id,
         p.name AS party_name,
-        p.status AS party_status
+        p.status AS party_status,
+        p.party_type,
+        p.leader_id,
+        p.party_channel_id
       FROM schedule_events se
       INNER JOIN parties p ON p.id = se.party_id
       LEFT JOIN schedule_event_times setm ON setm.event_id = se.id
@@ -194,6 +198,14 @@ async function createScheduleEvent({
       )
     }
 
+    if (party.party_type !== PARTY_TYPE.STATIC) {
+      throw new ServiceError(
+        "ปาร์ตี้เฉพาะกิจไม่สามารถใช้ /schedule create ได้",
+        "SCHEDULE_NOT_ALLOWED_FOR_AD_HOC_PARTY",
+        { partyId, partyType: party.party_type }
+      )
+    }
+
     const member = await getActivePartyMember(tx, partyId, creatorId)
     if (!member) {
       throw new ServiceError(
@@ -203,23 +215,27 @@ async function createScheduleEvent({
       )
     }
 
-    const existingVotingEvent = await getOne(
+    const existingActiveEvent = await getOne(
       tx,
       `
-        SELECT id
+        SELECT id, status
         FROM schedule_events
         WHERE party_id = ?
-          AND status = ?
+          AND status IN (?, ?)
         LIMIT 1
       `,
-      [partyId, SCHEDULE_STATUS.VOTING]
+      [partyId, SCHEDULE_STATUS.VOTING, SCHEDULE_STATUS.LOCKED]
     )
 
-    if (existingVotingEvent) {
+    if (existingActiveEvent) {
       throw new ServiceError(
-        "This party already has an active schedule vote.",
+        "ปาร์ตี้นี้มีตารางที่กำลังใช้งานอยู่แล้ว กรุณายกเลิกหรือเคลียร์ของเดิมก่อน",
         "SCHEDULE_ALREADY_OPEN",
-        { partyId, eventId: existingVotingEvent.id }
+        {
+          partyId,
+          eventId: existingActiveEvent.id,
+          status: existingActiveEvent.status
+        }
       )
     }
 
@@ -562,6 +578,87 @@ async function cancelScheduleEvent({
   })
 }
 
+async function completeScheduleEvent({
+  eventId,
+  actorId,
+  reason = "Completed manually."
+}) {
+  requireValue(eventId, "eventId is required.")
+  requireValue(actorId, "actorId is required.")
+
+  return withTransaction("write", async (tx) => {
+    const event = await getScheduleEventRecord(tx, eventId)
+    const party = await getPartyForScheduling(tx, event.party_id)
+
+    if (party.leader_id !== actorId) {
+      throw new ServiceError(
+        "Only the party leader can complete a schedule event.",
+        "NOT_PARTY_LEADER",
+        { eventId, actorId }
+      )
+    }
+
+    if (event.status === SCHEDULE_STATUS.EXPIRED) {
+      return loadScheduleEventDetails(tx, eventId)
+    }
+
+    if (event.status !== SCHEDULE_STATUS.LOCKED) {
+      throw new ServiceError(
+        "Only locked schedules can be completed.",
+        "SCHEDULE_NOT_LOCKED",
+        { eventId, status: event.status }
+      )
+    }
+
+    const completedAt = now()
+
+    await run(
+      tx,
+      `
+        UPDATE schedule_events
+        SET status = ?,
+            cancelled_reason = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+      [SCHEDULE_STATUS.EXPIRED, reason, eventId]
+    )
+
+    await run(
+      tx,
+      `
+        UPDATE parties
+        SET status = ?
+        WHERE id = ?
+          AND party_type = ?
+          AND status = ?
+      `,
+      [PARTY_STATUS.ACTIVE, event.party_id, PARTY_TYPE.STATIC, PARTY_STATUS.SCHEDULED]
+    )
+
+    await run(
+      tx,
+      `
+        UPDATE schedule_completion_prompts
+        SET completed_at = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE event_id = ?
+      `,
+      [completedAt, eventId]
+    )
+
+    await insertScheduleLog(tx, {
+      partyId: event.party_id,
+      actorId,
+      action: "schedule_completed",
+      scheduleEventId: eventId,
+      meta: { reason, completedAt }
+    })
+
+    return loadScheduleEventDetails(tx, eventId)
+  })
+}
+
 async function updateScheduleMessages({
   eventId,
   voteMessageId = null,
@@ -591,6 +688,74 @@ async function updateScheduleMessages({
   })
 }
 
+async function listScheduleEventsNeedingCompletionPrompt({
+  nowUnix = Math.floor(Date.now() / 1000),
+  delaySeconds = 60 * 60
+} = {}) {
+  const thresholdUnix = nowUnix - delaySeconds
+
+  return getMany(
+    db,
+    `
+      SELECT
+        se.id,
+        se.party_id,
+        se.title,
+        se.description,
+        se.proposed_start_at,
+        se.status,
+        se.timezone,
+        se.source_channel_id,
+        se.vote_message_id,
+        setm.start_at_unix,
+        setm.end_at_unix,
+        p.guild_id,
+        p.name AS party_name,
+        p.leader_id,
+        p.party_role_id,
+        p.party_channel_id,
+        p.party_type
+      FROM schedule_events se
+      INNER JOIN parties p ON p.id = se.party_id
+      INNER JOIN schedule_event_times setm ON setm.event_id = se.id
+      LEFT JOIN schedule_completion_prompts scp ON scp.event_id = se.id
+      WHERE se.status = ?
+        AND p.party_type = ?
+        AND setm.start_at_unix IS NOT NULL
+        AND setm.start_at_unix <= ?
+        AND scp.event_id IS NULL
+      ORDER BY setm.start_at_unix ASC, se.id ASC
+    `,
+    [SCHEDULE_STATUS.LOCKED, PARTY_TYPE.STATIC, thresholdUnix]
+  )
+}
+
+async function markScheduleCompletionPromptSent({
+  eventId,
+  promptChannelId = null,
+  promptMessageId = null
+}) {
+  requireValue(eventId, "eventId is required.")
+
+  await run(
+    db,
+    `
+      INSERT INTO schedule_completion_prompts (
+        event_id,
+        prompt_channel_id,
+        prompt_message_id
+      )
+      VALUES (?, ?, ?)
+      ON CONFLICT (event_id)
+      DO UPDATE SET
+        prompt_channel_id = COALESCE(excluded.prompt_channel_id, schedule_completion_prompts.prompt_channel_id),
+        prompt_message_id = COALESCE(excluded.prompt_message_id, schedule_completion_prompts.prompt_message_id),
+        updated_at = CURRENT_TIMESTAMP
+    `,
+    [eventId, promptChannelId, promptMessageId]
+  )
+}
+
 async function listGuildLockedScheduleEntries(guildId) {
   requireValue(guildId, "guildId is required.")
 
@@ -617,21 +782,32 @@ async function listGuildLockedScheduleEntries(guildId) {
       INNER JOIN parties p ON p.id = se.party_id
       INNER JOIN schedule_event_times setm ON setm.event_id = se.id
       WHERE p.guild_id = ?
+        AND p.party_type = ?
         AND se.status = ?
-      ORDER BY setm.start_at_unix ASC, se.id ASC
+      ORDER BY
+        CASE
+          WHEN setm.start_at_unix IS NULL THEN 1
+          ELSE 0
+        END ASC,
+        setm.start_at_unix ASC,
+        se.proposed_start_at ASC,
+        se.id ASC
     `,
-    [guildId, SCHEDULE_STATUS.LOCKED]
+    [guildId, PARTY_TYPE.STATIC, SCHEDULE_STATUS.LOCKED]
   )
 }
 
 module.exports = {
   cancelScheduleEvent,
+  completeScheduleEvent,
   createScheduleEvent,
   getScheduleEventById,
   getLatestScheduleEventForParty,
   getVotingScheduleEventForParty,
   listGuildLockedScheduleEntries,
+  listScheduleEventsNeedingCompletionPrompt,
   listPartyScheduleEvents,
+  markScheduleCompletionPromptSent,
   updateScheduleMessages,
   voteOnSchedule
 }

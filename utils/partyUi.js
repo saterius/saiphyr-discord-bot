@@ -352,7 +352,27 @@ function buildScheduleEmbed(event, party) {
 }
 
 function buildScheduleBoardOverviewEmbeds(entries, guildId) {
-  const sortedEntries = [...entries].sort((a, b) => (a.start_at_unix || 0) - (b.start_at_unix || 0))
+  const sortedEntries = [...entries].sort((a, b) => {
+    const aHasUnix = Number.isFinite(a.start_at_unix)
+    const bHasUnix = Number.isFinite(b.start_at_unix)
+
+    if (aHasUnix && bHasUnix && a.start_at_unix !== b.start_at_unix) {
+      return a.start_at_unix - b.start_at_unix
+    }
+
+    if (aHasUnix !== bHasUnix) {
+      return aHasUnix ? -1 : 1
+    }
+
+    const aProposed = a.proposed_start_at || ""
+    const bProposed = b.proposed_start_at || ""
+
+    if (aProposed !== bProposed) {
+      return aProposed.localeCompare(bProposed)
+    }
+
+    return (a.id || 0) - (b.id || 0)
+  })
 
   if (!sortedEntries.length) {
     return [
@@ -422,6 +442,18 @@ function buildScheduleActionRows(event) {
   ]
 }
 
+function buildScheduleCompletionPromptRows(eventId, { disabled = false } = {}) {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`schedule:complete:${eventId}`)
+        .setLabel("เสร็จสิ้นตาราง")
+        .setStyle(ButtonStyle.Success)
+        .setDisabled(disabled)
+    )
+  ]
+}
+
 function buildPartyConfirmationNotice(party) {
   const mentions = party.members
     .filter((member) => ["joined", "confirmed"].includes(member.join_status))
@@ -447,6 +479,14 @@ function buildScheduleCancelledNotice(event) {
   return `ตารางนัดเวลาถูกยกเลิกแล้ว. เหตุผล: ${event.cancelled_reason || "มีสมาชิกไม่สะดวกสำหรับช่วงเวลานั้น."}`
 }
 
+function buildScheduleCompletionNotice(event) {
+  return [
+    `<@${event.leader_id}> เลยเวลานัดของปาร์ตี้นี้มาแล้วประมาณ 1 ชั่วโมง`,
+    `ถ้าลงกันเรียบร้อยแล้ว สามารถกดปุ่ม "เสร็จสิ้นตาราง" ได้เลย`,
+    `เวลานัด: ${renderScheduleWindow(event)}`
+  ].join("\n")
+}
+
 module.exports = {
   buildClassSelectRow,
   buildPartyCancelConfirmRows,
@@ -459,6 +499,8 @@ module.exports = {
   buildScheduleActionRows,
   buildScheduleBoardOverviewEmbeds,
   buildScheduleCancelledNotice,
+  buildScheduleCompletionNotice,
+  buildScheduleCompletionPromptRows,
   buildScheduleEmbed,
   buildScheduleLockedNotice,
   getClassOption

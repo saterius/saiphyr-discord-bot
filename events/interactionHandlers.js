@@ -10,7 +10,8 @@ const {
   provisionPartyAndAnnounce,
   refreshPartyRecruitmentMessage,
   refreshScheduleVoteMessage,
-  sendPartyConfirmationPrompt
+  sendPartyConfirmationPrompt,
+  syncGuildScheduleBoard
 } = require("../services/partyMessageService")
 const {
   buildClassSelectRow,
@@ -405,11 +406,49 @@ async function handlePartyClassSelect(interaction) {
 async function handleScheduleButton(interaction) {
   const [, action, eventIdValue, vote] = interaction.customId.split(":")
 
+  const eventId = Number(eventIdValue)
+
+  if (action === "complete") {
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+
+    const event = await scheduleService.getScheduleEventById(eventId)
+
+    if (event.leader_id !== interaction.user.id) {
+      throw new ServiceError(
+        "หัวหน้าปาร์ตี้เท่านั้นที่เสร็จสิ้นตารางนัดเวลาได้",
+        "NOT_PARTY_LEADER",
+        { eventId, actorId: interaction.user.id }
+      )
+    }
+
+    await scheduleService.completeScheduleEvent({
+      eventId,
+      actorId: interaction.user.id,
+      reason: "เสร็จสิ้นจากปุ่มแจ้งเตือนหลังเลยเวลานัด"
+    })
+
+    await refreshScheduleVoteMessage(interaction.client, eventId)
+    await syncGuildScheduleBoard(interaction.client, event.guild_id)
+
+    if (interaction.message?.editable) {
+      await interaction.message.edit({
+        content: `ตารางนัดเวลา #${eventId} ถูกเสร็จสิ้นแล้ว`,
+        components: []
+      }).catch(() => null)
+    }
+
+    await interaction.editReply({
+      content: `เสร็จสิ้นตารางนัดเวลา #${eventId} เรียบร้อยแล้ว`
+    })
+
+    return true
+  }
+
   if (action !== "vote") {
     return false
   }
-
-  const eventId = Number(eventIdValue)
 
   await interaction.deferReply({
     flags: MessageFlags.Ephemeral
