@@ -65,12 +65,6 @@ module.exports = {
       subcommand
         .setName("create")
         .setDescription("สร้างโหวตตารางเวลาสำหรับปาร์ตี้")
-        .addStringOption((option) =>
-          option
-            .setName("title")
-            .setDescription("หัวข้อตาราง")
-            .setRequired(true)
-        )
         .addIntegerOption((option) =>
           option
             .setName("year")
@@ -111,17 +105,10 @@ module.exports = {
             .setMaxValue(59)
             .setRequired(true)
         )
-        .addIntegerOption((option) =>
-          option
-            .setName("duration_minutes")
-            .setDescription("Optional duration in minutes")
-            .setMinValue(15)
-            .setMaxValue(600)
-        )
         .addStringOption((option) =>
           option
             .setName("description")
-            .setDescription("โน้ตสำหรับตารางเวลานี้")
+            .setDescription("หมายเหตุสำหรับตารางเวลานี้")
         )
     )
     .addSubcommand((subcommand) =>
@@ -146,13 +133,11 @@ module.exports = {
     if (subcommand === "create") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral })
 
-      const title = interaction.options.getString("title")
       const year = interaction.options.getInteger("year")
       const month = interaction.options.getInteger("month")
       const day = interaction.options.getInteger("day")
       const hour = interaction.options.getInteger("hour")
       const minute = interaction.options.getInteger("minute")
-      const durationMinutes = interaction.options.getInteger("duration_minutes")
       const description = interaction.options.getString("description")
       const party = await resolvePartyFromChannel(interaction)
       const scheduleConfig = await getScheduleConfig(interaction.guildId)
@@ -167,21 +152,17 @@ module.exports = {
 
       const resolvedBoardChannelId = scheduleConfig.board_channel_id
       const startAtUnix = buildBangkokUnixTimestamp(year, month, day, hour, minute)
-      const endAtUnix = durationMinutes ? startAtUnix + (durationMinutes * 60) : null
       const proposedStartAt = formatBangkokDateText(year, month, day, hour, minute)
-      const proposedEndAt = endAtUnix
-        ? `<t:${endAtUnix}:F>`
-        : null
 
       const event = await scheduleService.createScheduleEvent({
         partyId: party.id,
         creatorId: interaction.user.id,
-        title,
+        title: party.name,
         description,
         proposedStartAt,
-        proposedEndAt,
+        proposedEndAt: null,
         startAtUnix,
-        endAtUnix,
+        endAtUnix: null,
         sourceChannelId: interaction.channelId,
         boardChannelId: resolvedBoardChannelId
       })

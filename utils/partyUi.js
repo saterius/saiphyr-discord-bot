@@ -8,7 +8,6 @@ const {
 
 const dragonNestClasses = require("../data/dragonNestClasses")
 const {
-  CONFIRMATION_RESPONSE,
   PARTY_STATUS,
   PARTY_TYPE,
   SCHEDULE_STATUS,
@@ -43,12 +42,10 @@ function renderScheduleWindow(event) {
   if (event.start_at_unix) {
     const startFull = renderDiscordTimestamp(event.start_at_unix, "F")
     const startRelative = renderDiscordTimestamp(event.start_at_unix, "R")
-    const endShort = event.end_at_unix ? ` -> ${renderDiscordTimestamp(event.end_at_unix, "t")}` : ""
-
-    return `${startFull}${endShort}\n${startRelative}`
+    return `${startFull}\n${startRelative}`
   }
 
-  return `${event.proposed_start_at}${event.proposed_end_at ? ` -> ${event.proposed_end_at}` : ""}`
+  return event.proposed_start_at || "-"
 }
 
 function renderPartyPlannedTime(party) {
@@ -62,11 +59,11 @@ function renderPartyPlannedTime(party) {
 function partyStatusLabel(status) {
   const labels = {
     [PARTY_STATUS.RECRUITING]: "กำลังรับคน",
-    [PARTY_STATUS.PENDING_CONFIRM]: "รอการยืนยัน",
-    [PARTY_STATUS.ACTIVE]: "ยืนยัน",
-    [PARTY_STATUS.SCHEDULED]: "กำหนดแล้ว",
-    [PARTY_STATUS.CLOSED]: "ปิด",
-    [PARTY_STATUS.CANCELLED]: "ถูกยกเลิก"
+    [PARTY_STATUS.PENDING_CONFIRM]: "รอยืนยัน",
+    [PARTY_STATUS.ACTIVE]: "พร้อมลุย",
+    [PARTY_STATUS.SCHEDULED]: "นัดแล้ว",
+    [PARTY_STATUS.CLOSED]: "ปิดแล้ว",
+    [PARTY_STATUS.CANCELLED]: "ยกเลิกแล้ว"
   }
 
   return labels[status] || status
@@ -84,7 +81,7 @@ function partyStatusMeta(status) {
       emoji: "🟡",
       color: 0xf08c00,
       titlePrefix: "รอยืนยัน",
-      highlight: "สมาชิกครบแล้ว รอทุกคนกดยืนยัน"
+      highlight: "สมาชิกครบหรือปิดรับแล้ว รอทุกคนกดยืนยัน"
     },
     [PARTY_STATUS.ACTIVE]: {
       emoji: "🔵",
@@ -102,7 +99,7 @@ function partyStatusMeta(status) {
       emoji: "⚫",
       color: 0x495057,
       titlePrefix: "ปิดแล้ว",
-      highlight: "ปาร์ตี้นี้ปิดรับแล้ว"
+      highlight: "ปาร์ตี้นี้ปิดแล้ว"
     },
     [PARTY_STATUS.CANCELLED]: {
       emoji: "🔴",
@@ -113,7 +110,7 @@ function partyStatusMeta(status) {
   }
 
   return meta[status] || {
-    emoji: "ℹ️",
+    emoji: "📌",
     color: 0x495057,
     titlePrefix: "ปาร์ตี้",
     highlight: partyStatusLabel(status)
@@ -123,8 +120,8 @@ function partyStatusMeta(status) {
 function scheduleStatusLabel(status) {
   const labels = {
     [SCHEDULE_STATUS.VOTING]: "กำลังโหวต",
-    [SCHEDULE_STATUS.LOCKED]: "ล็อก",
-    [SCHEDULE_STATUS.CANCELLED]: "ถูกยกเลิก",
+    [SCHEDULE_STATUS.LOCKED]: "ล็อกแล้ว",
+    [SCHEDULE_STATUS.CANCELLED]: "ยกเลิกแล้ว",
     [SCHEDULE_STATUS.EXPIRED]: "หมดเวลา"
   }
 
@@ -143,7 +140,7 @@ function partyTypeLabel(type) {
 function formatMember(member) {
   const job = member.class_label || getClassOption(member.class_key)?.label || member.class_key
   const confirm = member.confirmation_response
-    ? ` | Confirm: ${member.confirmation_response}`
+    ? ` | ยืนยัน: ${member.confirmation_response}`
     : ""
 
   return `- <@${member.user_id}> | ${job} | ${member.join_status}${confirm}`
@@ -154,7 +151,7 @@ function buildPartyEmbed(party) {
   const maxMembers = Number(party.max_members || 0)
   const memberLines = party.members?.length
     ? party.members.map(formatMember).join("\n")
-    : "No members yet."
+    : "ยังไม่มีสมาชิก"
   const statusMeta = partyStatusMeta(party.status)
   const fields = [
     {
@@ -313,7 +310,7 @@ function buildScheduleEmbed(event, party) {
     .join(", ") || "-"
 
   return new EmbedBuilder()
-    .setTitle(`Schedule Vote: ${event.title}`)
+    .setTitle("Schedule Vote")
     .setDescription(event.description || `โหวตตารางนัดเวลาสำหรับปาร์ตี้ ${party.name}`)
     .setColor(
       event.status === SCHEDULE_STATUS.LOCKED
@@ -350,7 +347,7 @@ function buildScheduleEmbed(event, party) {
       }
     )
     .setFooter({
-      text: `ตารางนัดเวลา #${event.id} • ไทม์โซน: ${event.timezone || "Asia/Bangkok"}`
+      text: `ตารางเวลา #${event.id} | ไทม์โซน: ${event.timezone || "Asia/Bangkok"}`
     })
 }
 
@@ -373,23 +370,31 @@ function buildScheduleBoardOverviewEmbeds(entries, guildId) {
 
   return chunks.map((chunk, index) => {
     const embed = new EmbedBuilder()
-      .setTitle(index === 0 ? "ตารางนัดเวลา" : `Schedule Board • หน้า ${index + 1}`)
-      .setDescription("ตารางการนัดเวลาปาร์ตี้")
+      .setTitle(index === 0 ? "ตารางนัดเวลา" : `Schedule Board หน้า ${index + 1}`)
+      .setDescription(
+        index === 0
+          ? `ตารางการนัดเวลาปาร์ตี้\nมีรายการทั้งหมด: **${sortedEntries.length}** ปาร์ตี้`
+          : "ตารางการนัดเวลาปาร์ตี้"
+      )
       .setColor(0x1971c2)
 
     for (const entry of chunk) {
       const roleMention = entry.party_role_id ? `<@&${entry.party_role_id}>` : entry.party_name
-      const partyRoom = entry.party_channel_id ? `<#${entry.party_channel_id}>` : "No party room"
+      const partyRoom = entry.party_channel_id ? `<#${entry.party_channel_id}>` : "-"
       const voteJumpUrl = entry.vote_message_id && entry.source_channel_id
         ? `https://discord.com/channels/${entry.guild_id}/${entry.source_channel_id}/${entry.vote_message_id}`
         : null
-      const jumpLine = voteJumpUrl ? `\n[Vote Post](${voteJumpUrl})` : ""
+      const jumpLine = voteJumpUrl ? `\nดูข้อความโหวต: [Jump ไปยังโพสต์](${voteJumpUrl})` : ""
+      const lines = [
+        `เวลาลง: ${renderScheduleWindow(entry)}`,
+        `หัวหน้าปาร์ตี้: <@${entry.leader_id}>`,
+        `ยศปาร์ตี้: ${roleMention}`,
+        `ห้องปาร์ตี้: ${partyRoom}`
+      ]
 
       embed.addFields({
-        name: `${entry.party_name} • ${entry.title}`,
-        value: truncate(
-          `${renderScheduleWindow(entry)}\nหัวหน้าปาร์ตี้: <@${entry.leader_id}>\nปาร์ตี้: ${roleMention}\nช่อง: ${partyRoom}${jumpLine}`
-        ),
+        name: `ตี้ ${entry.party_name}`,
+        value: truncate(`${lines.join("\n")}${jumpLine}`),
         inline: false
       })
     }
@@ -435,7 +440,7 @@ function buildPartyActivationNotice(party) {
 
 function buildScheduleLockedNotice(event) {
   const boardMention = event.board_channel_id ? `<#${event.board_channel_id}>` : "the schedule board"
-  return `ตารางนัดเวลาถูกล็อก ${event.proposed_start_at}. ตารางนัดเวลาถูกโพสต์ที่ ${boardMention}.`
+  return `ตารางนัดเวลาได้รับการล็อกแล้วที่ ${event.proposed_start_at}. ตารางนี้ถูกโพสต์ไปที่ ${boardMention}.`
 }
 
 function buildScheduleCancelledNotice(event) {

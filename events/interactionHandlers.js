@@ -430,7 +430,7 @@ async function handleScheduleButton(interaction) {
   }
 
   await interaction.editReply({
-    content: `Your vote for schedule #${eventId} was recorded as ${vote}.`
+    content: `การโหวตตารางนัดเวลา #${eventId} ถูกบันทึกว่า ${vote}.`
   })
 
   return true

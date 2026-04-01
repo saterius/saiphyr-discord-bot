@@ -446,7 +446,7 @@ async function voteOnSchedule({
         [
           SCHEDULE_STATUS.CANCELLED,
           votedAt,
-          note || "A party member denied the proposed schedule.",
+          note || "มีสมาชิกไม่สะดวกสำหรับช่วงเวลานั้น.",
           eventId
         ]
       )
