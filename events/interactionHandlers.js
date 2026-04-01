@@ -270,6 +270,15 @@ async function handlePartyButton(interaction) {
 
   if (action === "finish_abort") {
     const partyId = Number(parts[0])
+    const party = await partyService.getPartyById(partyId)
+
+    if (party.leader_id !== interaction.user.id) {
+      throw new ServiceError(
+        "หัวหน้าปาร์ตี้เท่านั้นที่จัดการข้อความนี้ได้.",
+        "NOT_PARTY_LEADER",
+        { partyId, actorId: interaction.user.id }
+      )
+    }
 
     await interaction.update({
       content: `เก็บปาร์ตี้ #${partyId} ไว้ก่อน ตอนพร้อมค่อยใช้ /party finish ได้เสมอ`,
