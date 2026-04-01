@@ -8,6 +8,11 @@ CREATE TABLE IF NOT EXISTS parties (
   party_channel_id TEXT,
   name TEXT NOT NULL,
   description TEXT,
+  party_type TEXT NOT NULL DEFAULT 'ad_hoc' CHECK (
+    party_type IN ('static', 'ad_hoc')
+  ),
+  planned_start_at_unix INTEGER,
+  planned_timezone TEXT,
   max_members INTEGER NOT NULL DEFAULT 8 CHECK (max_members > 0),
   status TEXT NOT NULL DEFAULT 'recruiting' CHECK (
     status IN ('recruiting', 'pending_confirm', 'active', 'scheduled', 'closed', 'cancelled')

@@ -7,6 +7,11 @@ const PARTY_STATUS = Object.freeze({
   CANCELLED: "cancelled"
 })
 
+const PARTY_TYPE = Object.freeze({
+  STATIC: "static",
+  AD_HOC: "ad_hoc"
+})
+
 const MEMBER_STATUS = Object.freeze({
   JOINED: "joined",
   CONFIRMED: "confirmed",
@@ -36,6 +41,7 @@ module.exports = {
   CONFIRMATION_RESPONSE,
   MEMBER_STATUS,
   PARTY_STATUS,
+  PARTY_TYPE,
   SCHEDULE_STATUS,
   SCHEDULE_VOTE
 }

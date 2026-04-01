@@ -105,11 +105,14 @@ async function getScheduleEventRecord(executor, eventId) {
     `
       SELECT
         se.*,
+        setm.start_at_unix,
+        setm.end_at_unix,
         p.guild_id,
         p.name AS party_name,
         p.status AS party_status
       FROM schedule_events se
       INNER JOIN parties p ON p.id = se.party_id
+      LEFT JOIN schedule_event_times setm ON setm.event_id = se.id
       WHERE se.id = ?
     `,
     [eventId]
@@ -165,6 +168,8 @@ async function createScheduleEvent({
   description = null,
   proposedStartAt,
   proposedEndAt = null,
+  startAtUnix,
+  endAtUnix = null,
   timezone = "Asia/Bangkok",
   voteDeadlineAt = null,
   sourceChannelId = null,
@@ -176,6 +181,7 @@ async function createScheduleEvent({
   requireValue(creatorId, "creatorId is required.")
   requireValue(title, "title is required.")
   requireValue(proposedStartAt, "proposedStartAt is required.")
+  requireValue(startAtUnix, "startAtUnix is required.")
 
   return withTransaction("write", async (tx) => {
     const party = await getPartyForScheduling(tx, partyId)
@@ -254,6 +260,19 @@ async function createScheduleEvent({
 
     const eventId = result.lastInsertRowid
 
+    await run(
+      tx,
+      `
+        INSERT INTO schedule_event_times (
+          event_id,
+          start_at_unix,
+          end_at_unix
+        )
+        VALUES (?, ?, ?)
+      `,
+      [eventId, startAtUnix, endAtUnix]
+    )
+
     await insertScheduleLog(tx, {
       partyId,
       actorId: creatorId,
@@ -268,6 +287,51 @@ async function createScheduleEvent({
 
 async function getScheduleEventById(eventId) {
   return loadScheduleEventDetails(db, eventId)
+}
+
+async function getLatestScheduleEventForParty(partyId) {
+  requireValue(partyId, "partyId is required.")
+
+  const event = await getOne(
+    db,
+    `
+      SELECT id
+      FROM schedule_events
+      WHERE party_id = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    `,
+    [partyId]
+  )
+
+  if (!event) {
+    return null
+  }
+
+  return loadScheduleEventDetails(db, event.id)
+}
+
+async function getVotingScheduleEventForParty(partyId) {
+  requireValue(partyId, "partyId is required.")
+
+  const event = await getOne(
+    db,
+    `
+      SELECT id
+      FROM schedule_events
+      WHERE party_id = ?
+        AND status = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    `,
+    [partyId, SCHEDULE_STATUS.VOTING]
+  )
+
+  if (!event) {
+    return null
+  }
+
+  return loadScheduleEventDetails(db, event.id)
 }
 
 async function listPartyScheduleEvents(partyId, { statuses = [] } = {}) {
@@ -286,9 +350,12 @@ async function listPartyScheduleEvents(partyId, { statuses = [] } = {}) {
     `
       SELECT
         se.*,
+        setm.start_at_unix,
+        setm.end_at_unix,
         COUNT(CASE WHEN sv.vote = 'accept' THEN 1 END) AS accept_count,
         COUNT(CASE WHEN sv.vote = 'deny' THEN 1 END) AS deny_count
       FROM schedule_events se
+      LEFT JOIN schedule_event_times setm ON setm.event_id = se.id
       LEFT JOIN schedule_votes sv ON sv.event_id = se.id
       WHERE se.party_id = ?
         ${filter}
@@ -524,10 +591,46 @@ async function updateScheduleMessages({
   })
 }
 
+async function listGuildLockedScheduleEntries(guildId) {
+  requireValue(guildId, "guildId is required.")
+
+  return getMany(
+    db,
+    `
+      SELECT
+        se.id,
+        se.party_id,
+        se.title,
+        se.description,
+        se.status,
+        se.timezone,
+        se.source_channel_id,
+        se.vote_message_id,
+        setm.start_at_unix,
+        setm.end_at_unix,
+        p.guild_id,
+        p.name AS party_name,
+        p.leader_id,
+        p.party_role_id,
+        p.party_channel_id
+      FROM schedule_events se
+      INNER JOIN parties p ON p.id = se.party_id
+      INNER JOIN schedule_event_times setm ON setm.event_id = se.id
+      WHERE p.guild_id = ?
+        AND se.status = ?
+      ORDER BY setm.start_at_unix ASC, se.id ASC
+    `,
+    [guildId, SCHEDULE_STATUS.LOCKED]
+  )
+}
+
 module.exports = {
   cancelScheduleEvent,
   createScheduleEvent,
   getScheduleEventById,
+  getLatestScheduleEventForParty,
+  getVotingScheduleEventForParty,
+  listGuildLockedScheduleEntries,
   listPartyScheduleEvents,
   updateScheduleMessages,
   voteOnSchedule

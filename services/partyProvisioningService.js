@@ -6,6 +6,7 @@ const {
 const ServiceError = require("./serviceError")
 const { PARTY_STATUS } = require("./partyConstants")
 const partyService = require("./partyService")
+const { getPartyChannelConfig } = require("./guildConfigService")
 
 function defaultRoleName(party) {
   return `Party - ${party.name}`
@@ -106,8 +107,13 @@ async function provisionPartyResources(guild, partyId, options = {}) {
     )
   }
 
+  const partyChannelConfig = await getPartyChannelConfig(guild.id)
+  const resolvedParentId = options.parentId || partyChannelConfig?.category_channel_id || null
   const role = await resolveRole(guild, party, options.roleName)
-  const channel = await resolveTextChannel(guild, party, role, options)
+  const channel = await resolveTextChannel(guild, party, role, {
+    ...options,
+    parentId: resolvedParentId
+  })
 
   await assignPartyRole(guild, party, role)
 

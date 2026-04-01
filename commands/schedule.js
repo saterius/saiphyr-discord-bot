@@ -8,7 +8,8 @@ const scheduleService = require("../services/scheduleService")
 const { getScheduleConfig } = require("../services/guildConfigService")
 const ServiceError = require("../services/serviceError")
 const {
-  refreshScheduleVoteMessage
+  refreshScheduleVoteMessage,
+  syncGuildScheduleBoard
 } = require("../services/partyMessageService")
 const {
   buildScheduleActionRows,
@@ -16,89 +17,126 @@ const {
 } = require("../utils/partyUi")
 
 function ensurePartyChannel(interaction, party) {
-  if (!party.party_channel_id) {
+  if (!party) {
     throw new ServiceError(
-      "This party does not have a party channel yet. Wait until the party is active and the room is created first.",
-      "PARTY_CHANNEL_NOT_READY",
-      { partyId: party.id }
+      "ใช้คำสั่ง /schedule ได้แค่ในช่องของปาร์ตี้เท่านั้น.",
+      "INVALID_SCHEDULE_CHANNEL",
+      { actualChannelId: interaction.channelId }
+    )
+  }
+}
+
+async function resolvePartyFromChannel(interaction) {
+  const party = await partyService.getPartyByChannelId(interaction.channelId)
+  ensurePartyChannel(interaction, party)
+  return party
+}
+
+function buildBangkokUnixTimestamp(year, month, day, hour, minute) {
+  const utcMillis = Date.UTC(year, month - 1, day, hour - 7, minute, 0, 0)
+  const bangkokDate = new Date(utcMillis + (7 * 60 * 60 * 1000))
+
+  if (
+    bangkokDate.getUTCFullYear() !== year ||
+    bangkokDate.getUTCMonth() !== month - 1 ||
+    bangkokDate.getUTCDate() !== day ||
+    bangkokDate.getUTCHours() !== hour ||
+    bangkokDate.getUTCMinutes() !== minute
+  ) {
+    throw new ServiceError(
+      "รูปแบบของวันที่หรือเวลาไม่ถูกต้อง. กรุณาตรวจสอบอีกครั้ง.",
+      "INVALID_SCHEDULE_DATETIME",
+      { year, month, day, hour, minute }
     )
   }
 
-  if (interaction.channelId !== party.party_channel_id) {
-    throw new ServiceError(
-      `Use this command in the party channel for this team: <#${party.party_channel_id}>`,
-      "INVALID_SCHEDULE_CHANNEL",
-      {
-        partyId: party.id,
-        expectedChannelId: party.party_channel_id,
-        actualChannelId: interaction.channelId
-      }
-    )
-  }
+  return Math.floor(utcMillis / 1000)
+}
+
+function formatBangkokDateText(year, month, day, hour, minute) {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")} ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")} (Asia/Bangkok)`
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("schedule")
-    .setDescription("Manage party schedule votes")
+    .setDescription("จัดการโหวตตารางของปาร์ตี้")
     .addSubcommand((subcommand) =>
       subcommand
         .setName("create")
-        .setDescription("Create a schedule vote for a party")
-        .addIntegerOption((option) =>
-          option
-            .setName("party_id")
-            .setDescription("Party ID")
-            .setRequired(true)
-        )
+        .setDescription("สร้างโหวตตารางเวลาสำหรับปาร์ตี้")
         .addStringOption((option) =>
           option
             .setName("title")
-            .setDescription("Schedule title")
+            .setDescription("หัวข้อตาราง")
             .setRequired(true)
         )
-        .addStringOption((option) =>
+        .addIntegerOption((option) =>
           option
-            .setName("start")
-            .setDescription("Start time text, e.g. 2026-04-01 20:00")
+            .setName("year")
+            .setDescription("ปี (ค.ศ.)")
+            .setMinValue(2025)
+            .setMaxValue(2100)
             .setRequired(true)
         )
-        .addStringOption((option) =>
+        .addIntegerOption((option) =>
           option
-            .setName("end")
-            .setDescription("Optional end time text")
+            .setName("month")
+            .setDescription("เดือน")
+            .setMinValue(1)
+            .setMaxValue(12)
+            .setRequired(true)
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("day")
+            .setDescription("วันที่")
+            .setMinValue(1)
+            .setMaxValue(31)
+            .setRequired(true)
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("hour")
+            .setDescription("ชั่วโมง")
+            .setMinValue(0)
+            .setMaxValue(23)
+            .setRequired(true)
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("minute")
+            .setDescription("นาที")
+            .setMinValue(0)
+            .setMaxValue(59)
+            .setRequired(true)
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("duration_minutes")
+            .setDescription("Optional duration in minutes")
+            .setMinValue(15)
+            .setMaxValue(600)
         )
         .addStringOption((option) =>
           option
             .setName("description")
-            .setDescription("Optional schedule note")
+            .setDescription("โน้ตสำหรับตารางเวลานี้")
         )
     )
     .addSubcommand((subcommand) =>
       subcommand
         .setName("show")
-        .setDescription("Show a schedule event")
-        .addIntegerOption((option) =>
-          option
-            .setName("event_id")
-            .setDescription("Schedule event ID")
-            .setRequired(true)
-        )
+        .setDescription("แสดงตารางเวลาของปาร์ตี้")
     )
     .addSubcommand((subcommand) =>
       subcommand
         .setName("cancel")
-        .setDescription("Cancel a schedule event")
-        .addIntegerOption((option) =>
-          option
-            .setName("event_id")
-            .setDescription("Schedule event ID")
-            .setRequired(true)
-        )
+        .setDescription("ยกเลิกการนัดตารางเวลา")
         .addStringOption((option) =>
           option
             .setName("reason")
-            .setDescription("Reason for cancellation")
+            .setDescription("เหตุผลที่ยกเลิก")
         )
     ),
 
@@ -108,32 +146,42 @@ module.exports = {
     if (subcommand === "create") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral })
 
-      const partyId = interaction.options.getInteger("party_id")
       const title = interaction.options.getString("title")
-      const start = interaction.options.getString("start")
-      const end = interaction.options.getString("end")
+      const year = interaction.options.getInteger("year")
+      const month = interaction.options.getInteger("month")
+      const day = interaction.options.getInteger("day")
+      const hour = interaction.options.getInteger("hour")
+      const minute = interaction.options.getInteger("minute")
+      const durationMinutes = interaction.options.getInteger("duration_minutes")
       const description = interaction.options.getString("description")
-      const party = await partyService.getPartyById(partyId)
+      const party = await resolvePartyFromChannel(interaction)
       const scheduleConfig = await getScheduleConfig(interaction.guildId)
-      ensurePartyChannel(interaction, party)
 
       if (!scheduleConfig?.board_channel_id) {
         throw new ServiceError(
-          "This guild does not have a schedule board yet. Ask an admin to run /setscheduleboard first.",
+          "ยังไม่ได้เลือกแชนแนลสำหรับช่องตารางเวลา. โปรดแจ้งผู้ดูแลให้ตั้งค่า /setscheduleboard ก่อน.",
           "SCHEDULE_BOARD_NOT_CONFIGURED",
           { guildId: interaction.guildId }
         )
       }
 
       const resolvedBoardChannelId = scheduleConfig.board_channel_id
+      const startAtUnix = buildBangkokUnixTimestamp(year, month, day, hour, minute)
+      const endAtUnix = durationMinutes ? startAtUnix + (durationMinutes * 60) : null
+      const proposedStartAt = formatBangkokDateText(year, month, day, hour, minute)
+      const proposedEndAt = endAtUnix
+        ? `<t:${endAtUnix}:F>`
+        : null
 
       const event = await scheduleService.createScheduleEvent({
-        partyId,
+        partyId: party.id,
         creatorId: interaction.user.id,
         title,
         description,
-        proposedStartAt: start,
-        proposedEndAt: end,
+        proposedStartAt,
+        proposedEndAt,
+        startAtUnix,
+        endAtUnix,
         sourceChannelId: interaction.channelId,
         boardChannelId: resolvedBoardChannelId
       })
@@ -152,17 +200,23 @@ module.exports = {
       })
 
       await interaction.editReply({
-        content: `Schedule vote #${event.id} created. Board: <#${resolvedBoardChannelId}>`
+        content: `ตารางเวลา #${event.id} ถูกสร้างแล้ว. บอร์ด: <#${resolvedBoardChannelId}>`
       })
 
       return
     }
 
     if (subcommand === "show") {
-      const eventId = interaction.options.getInteger("event_id")
-      const event = await scheduleService.getScheduleEventById(eventId)
-      const party = await partyService.getPartyById(event.party_id)
-      ensurePartyChannel(interaction, party)
+      const party = await resolvePartyFromChannel(interaction)
+      const event = await scheduleService.getLatestScheduleEventForParty(party.id)
+
+      if (!event) {
+        throw new ServiceError(
+          "ปาร์ตี้นี้ยังไม่มีการนัดตารางเวลา.",
+          "SCHEDULE_NOT_FOUND",
+          { partyId: party.id }
+        )
+      }
 
       await interaction.reply({
         embeds: [buildScheduleEmbed(event, party)],
@@ -175,22 +229,29 @@ module.exports = {
     if (subcommand === "cancel") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral })
 
-      const eventId = interaction.options.getInteger("event_id")
       const reason = interaction.options.getString("reason") || "Cancelled manually."
-      const event = await scheduleService.getScheduleEventById(eventId)
-      const party = await partyService.getPartyById(event.party_id)
-      ensurePartyChannel(interaction, party)
+      const party = await resolvePartyFromChannel(interaction)
+      const event = await scheduleService.getVotingScheduleEventForParty(party.id)
+
+      if (!event) {
+        throw new ServiceError(
+          "ปาร์ตี้นี้ไม่มีการนัดตารางเวลาที่ต้องการยกเลิก.",
+          "SCHEDULE_NOT_FOUND",
+          { partyId: party.id }
+        )
+      }
 
       await scheduleService.cancelScheduleEvent({
-        eventId,
+        eventId: event.id,
         actorId: interaction.user.id,
         reason
       })
 
-      await refreshScheduleVoteMessage(interaction.client, eventId)
+      await refreshScheduleVoteMessage(interaction.client, event.id)
+      await syncGuildScheduleBoard(interaction.client, interaction.guildId)
 
       await interaction.editReply({
-        content: `Schedule event #${eventId} cancelled.`
+        content: `ตารางเวลา #${event.id} ถูกยกเลิก.`
       })
     }
   }

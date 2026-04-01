@@ -10,6 +10,7 @@ const dragonNestClasses = require("../data/dragonNestClasses")
 const {
   CONFIRMATION_RESPONSE,
   PARTY_STATUS,
+  PARTY_TYPE,
   SCHEDULE_STATUS,
   SCHEDULE_VOTE
 } = require("../services/partyConstants")
@@ -30,14 +31,42 @@ function truncate(value, maxLength = 1024) {
   return `${value.slice(0, maxLength - 3)}...`
 }
 
+function renderDiscordTimestamp(unix, style = "F") {
+  if (!unix) {
+    return "-"
+  }
+
+  return `<t:${unix}:${style}>`
+}
+
+function renderScheduleWindow(event) {
+  if (event.start_at_unix) {
+    const startFull = renderDiscordTimestamp(event.start_at_unix, "F")
+    const startRelative = renderDiscordTimestamp(event.start_at_unix, "R")
+    const endShort = event.end_at_unix ? ` -> ${renderDiscordTimestamp(event.end_at_unix, "t")}` : ""
+
+    return `${startFull}${endShort}\n${startRelative}`
+  }
+
+  return `${event.proposed_start_at}${event.proposed_end_at ? ` -> ${event.proposed_end_at}` : ""}`
+}
+
+function renderPartyPlannedTime(party) {
+  if (!party.planned_start_at_unix) {
+    return "-"
+  }
+
+  return `${renderDiscordTimestamp(party.planned_start_at_unix, "F")}\n${renderDiscordTimestamp(party.planned_start_at_unix, "R")}`
+}
+
 function partyStatusLabel(status) {
   const labels = {
-    [PARTY_STATUS.RECRUITING]: "Recruiting",
-    [PARTY_STATUS.PENDING_CONFIRM]: "Waiting Confirm",
-    [PARTY_STATUS.ACTIVE]: "Active",
-    [PARTY_STATUS.SCHEDULED]: "Scheduled",
-    [PARTY_STATUS.CLOSED]: "Closed",
-    [PARTY_STATUS.CANCELLED]: "Cancelled"
+    [PARTY_STATUS.RECRUITING]: "กำลังรับคน",
+    [PARTY_STATUS.PENDING_CONFIRM]: "รอการยืนยัน",
+    [PARTY_STATUS.ACTIVE]: "ยืนยัน",
+    [PARTY_STATUS.SCHEDULED]: "กำหนดแล้ว",
+    [PARTY_STATUS.CLOSED]: "ปิด",
+    [PARTY_STATUS.CANCELLED]: "ถูกยกเลิก"
   }
 
   return labels[status] || status
@@ -45,13 +74,22 @@ function partyStatusLabel(status) {
 
 function scheduleStatusLabel(status) {
   const labels = {
-    [SCHEDULE_STATUS.VOTING]: "Voting",
-    [SCHEDULE_STATUS.LOCKED]: "Locked",
-    [SCHEDULE_STATUS.CANCELLED]: "Cancelled",
-    [SCHEDULE_STATUS.EXPIRED]: "Expired"
+    [SCHEDULE_STATUS.VOTING]: "กำลังโหวต",
+    [SCHEDULE_STATUS.LOCKED]: "ล็อก",
+    [SCHEDULE_STATUS.CANCELLED]: "ถูกยกเลิก",
+    [SCHEDULE_STATUS.EXPIRED]: "หมดเวลา"
   }
 
   return labels[status] || status
+}
+
+function partyTypeLabel(type) {
+  const labels = {
+    [PARTY_TYPE.STATIC]: "ประจำ",
+    [PARTY_TYPE.AD_HOC]: "เฉพาะกิจ"
+  }
+
+  return labels[type] || type || "-"
 }
 
 function formatMember(member) {
@@ -69,32 +107,47 @@ function buildPartyEmbed(party) {
   const memberLines = party.members?.length
     ? party.members.map(formatMember).join("\n")
     : "No members yet."
+  const fields = [
+    {
+      name: "สถานะ",
+      value: partyStatusLabel(party.status),
+      inline: true
+    },
+    {
+      name: "สมาชิก",
+      value: `${activeCount}/${maxMembers}`,
+      inline: true
+    },
+    {
+      name: "หัวหน้าปาร์ตี้",
+      value: `<@${party.leader_id}>`,
+      inline: true
+    },
+    {
+      name: "ประเภท",
+      value: partyTypeLabel(party.party_type),
+      inline: true
+    }
+  ]
+
+  if (party.party_type === PARTY_TYPE.AD_HOC && party.planned_start_at_unix) {
+    fields.push({
+      name: "เวลานัด",
+      value: renderPartyPlannedTime(party),
+      inline: false
+    })
+  }
+
+  fields.push({
+    name: "รายชื่อ",
+    value: truncate(memberLines)
+  })
 
   return new EmbedBuilder()
     .setTitle(`Party: ${party.name}`)
     .setDescription(party.description || "Dragon Nest party recruitment")
     .setColor(0x2b8a3e)
-    .addFields(
-      {
-        name: "Status",
-        value: partyStatusLabel(party.status),
-        inline: true
-      },
-      {
-        name: "Members",
-        value: `${activeCount}/${maxMembers}`,
-        inline: true
-      },
-      {
-        name: "Leader",
-        value: `<@${party.leader_id}>`,
-        inline: true
-      },
-      {
-        name: "Roster",
-        value: truncate(memberLines)
-      }
-    )
+    .addFields(fields)
 }
 
 function buildPartyActionRows(party) {
@@ -102,22 +155,28 @@ function buildPartyActionRows(party) {
     .includes(party.status)
   const joinDisabled = isClosed || party.status !== PARTY_STATUS.RECRUITING
   const confirmDisabled = party.status !== PARTY_STATUS.PENDING_CONFIRM
+  const cancelDisabled = [PARTY_STATUS.CLOSED, PARTY_STATUS.CANCELLED].includes(party.status)
 
   const actionRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`party:join:start:${party.id}`)
-      .setLabel("Join Party")
+      .setLabel("เข้าร่วมปาร์ตี้")
       .setStyle(ButtonStyle.Primary)
       .setDisabled(joinDisabled),
     new ButtonBuilder()
       .setCustomId(`party:confirm:${party.id}`)
-      .setLabel("Confirm Party")
+      .setLabel("ยืนยันปาร์ตี้")
       .setStyle(ButtonStyle.Success)
       .setDisabled(confirmDisabled),
     new ButtonBuilder()
       .setCustomId(`party:refresh:${party.id}`)
-      .setLabel("Refresh")
-      .setStyle(ButtonStyle.Secondary)
+      .setLabel("รีเฟรช")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`party:cancel:${party.id}`)
+      .setLabel("ยกเลิกปาร์ตี้")
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(cancelDisabled)
   )
 
   return [actionRow]
@@ -126,7 +185,7 @@ function buildPartyActionRows(party) {
 function buildClassSelectRow(partyId) {
   const menu = new StringSelectMenuBuilder()
     .setCustomId(`party:class:${partyId}`)
-    .setPlaceholder("Choose your Dragon Nest class")
+    .setPlaceholder("เลือกอาชีพของคุณ")
     .addOptions(
       dragonNestClasses.slice(0, 25).map((job) => ({
         label: job.label,
@@ -142,11 +201,26 @@ function buildJoinConfirmRows(partyId, classKey) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`party:join:confirm:${partyId}:${classKey}`)
-        .setLabel("Confirm Join")
+        .setLabel("ยืนยันที่จะเข้าร่วม")
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
         .setCustomId(`party:join:start:${partyId}`)
-        .setLabel("Change Class")
+        .setLabel("เปลี่ยนอาชีพ")
+        .setStyle(ButtonStyle.Secondary)
+    )
+  ]
+}
+
+function buildPartyCancelConfirmRows(partyId) {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`party:cancel_confirm:${partyId}`)
+        .setLabel("ยืนยันที่จะยกเลิก")
+        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId(`party:cancel_abort:${partyId}`)
+        .setLabel("เก็บปาร์ตี้ไว้")
         .setStyle(ButtonStyle.Secondary)
     )
   ]
@@ -165,7 +239,7 @@ function buildScheduleEmbed(event, party) {
 
   return new EmbedBuilder()
     .setTitle(`Schedule Vote: ${event.title}`)
-    .setDescription(event.description || `Schedule vote for ${party.name}`)
+    .setDescription(event.description || `โหวตตารางนัดเวลาสำหรับปาร์ตี้ ${party.name}`)
     .setColor(
       event.status === SCHEDULE_STATUS.LOCKED
         ? 0x1c7ed6
@@ -175,98 +249,78 @@ function buildScheduleEmbed(event, party) {
     )
     .addFields(
       {
-        name: "Party",
+        name: "ปาร์ตี้",
         value: party ? `${party.name}` : `#${event.party_id}`,
         inline: true
       },
       {
-        name: "Status",
+        name: "สถานะ",
         value: scheduleStatusLabel(event.status),
         inline: true
       },
       {
-        name: "Time",
-        value: `${event.proposed_start_at}${event.proposed_end_at ? ` -> ${event.proposed_end_at}` : ""}`,
+        name: "เวลา",
+        value: renderScheduleWindow(event),
         inline: false
       },
       {
-        name: "Accepted",
+        name: "ยอมรับ",
         value: truncate(acceptedMentions),
         inline: false
       },
       {
-        name: "Denied",
+        name: "ปฏิเสธ",
         value: truncate(deniedMentions),
         inline: false
       }
     )
     .setFooter({
-      text: `Schedule #${event.id} • Timezone: ${event.timezone || "Asia/Bangkok"}`
+      text: `ตารางนัดเวลา #${event.id} • ไทม์โซน: ${event.timezone || "Asia/Bangkok"}`
     })
 }
 
-function buildScheduleBoardEmbed(event, party) {
-  const activeMembers = party.members
-    .filter((member) => ["joined", "confirmed"].includes(member.join_status))
-    .map((member) => {
-      const job = member.class_label || getClassOption(member.class_key)?.label || member.class_key
-      return `- ${job} • <@${member.user_id}>`
-    })
-    .join("\n")
+function buildScheduleBoardOverviewEmbeds(entries, guildId) {
+  const sortedEntries = [...entries].sort((a, b) => (a.start_at_unix || 0) - (b.start_at_unix || 0))
 
-  const roleMention = party.party_role_id ? `<@&${party.party_role_id}>` : party.name
-  const partyRoom = party.party_channel_id ? `<#${party.party_channel_id}>` : "Not created yet"
-  const scheduleWindow = event.proposed_end_at
-    ? `${event.proposed_start_at} -> ${event.proposed_end_at}`
-    : event.proposed_start_at
-  const voteJumpUrl = event.vote_message_id && event.source_channel_id
-    ? `https://discord.com/channels/${party.guild_id}/${event.source_channel_id}/${event.vote_message_id}`
-    : null
-
-  const embed = new EmbedBuilder()
-    .setTitle(`Locked Schedule • ${party.name}`)
-    .setDescription(event.description || "Confirmed party schedule")
-    .setColor(0x1971c2)
-    .addFields(
-      {
-        name: "Party",
-        value: roleMention,
-        inline: true
-      },
-      {
-        name: "Leader",
-        value: `<@${party.leader_id}>`,
-        inline: true
-      },
-      {
-        name: "Party Room",
-        value: partyRoom,
-        inline: true
-      },
-      {
-        name: "Schedule",
-        value: scheduleWindow,
-        inline: false
-      },
-      {
-        name: "Roster",
-        value: truncate(activeMembers),
-        inline: false
-      }
-    )
-    .setFooter({
-      text: `Schedule #${event.id} • Locked • ${event.timezone || "Asia/Bangkok"}`
-    })
-
-  if (voteJumpUrl) {
-    embed.addFields({
-      name: "Vote Post",
-      value: `[Jump to original vote](${voteJumpUrl})`,
-      inline: false
-    })
+  if (!sortedEntries.length) {
+    return [
+      new EmbedBuilder()
+        .setTitle("Schedule Board")
+        .setDescription("ยังไม่มีการกำหนดตารางนัดเวลาสำหรับปาร์ตี้.")
+        .setColor(0x495057)
+    ]
   }
 
-  return embed
+  const chunks = []
+  for (let index = 0; index < sortedEntries.length; index += 8) {
+    chunks.push(sortedEntries.slice(index, index + 8))
+  }
+
+  return chunks.map((chunk, index) => {
+    const embed = new EmbedBuilder()
+      .setTitle(index === 0 ? "ตารางนัดเวลา" : `Schedule Board • หน้า ${index + 1}`)
+      .setDescription("ตารางการนัดเวลาปาร์ตี้")
+      .setColor(0x1971c2)
+
+    for (const entry of chunk) {
+      const roleMention = entry.party_role_id ? `<@&${entry.party_role_id}>` : entry.party_name
+      const partyRoom = entry.party_channel_id ? `<#${entry.party_channel_id}>` : "No party room"
+      const voteJumpUrl = entry.vote_message_id && entry.source_channel_id
+        ? `https://discord.com/channels/${entry.guild_id}/${entry.source_channel_id}/${entry.vote_message_id}`
+        : null
+      const jumpLine = voteJumpUrl ? `\n[Vote Post](${voteJumpUrl})` : ""
+
+      embed.addFields({
+        name: `${entry.party_name} • ${entry.title}`,
+        value: truncate(
+          `${renderScheduleWindow(entry)}\nหัวหน้าปาร์ตี้: <@${entry.leader_id}>\nปาร์ตี้: ${roleMention}\nช่อง: ${partyRoom}${jumpLine}`
+        ),
+        inline: false
+      })
+    }
+
+    return embed
+  })
 }
 
 function buildScheduleActionRows(event) {
@@ -276,12 +330,12 @@ function buildScheduleActionRows(event) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`schedule:vote:${event.id}:${SCHEDULE_VOTE.ACCEPT}`)
-        .setLabel("Accept")
+        .setLabel("ยอมรับ")
         .setStyle(ButtonStyle.Success)
         .setDisabled(disabled),
       new ButtonBuilder()
         .setCustomId(`schedule:vote:${event.id}:${SCHEDULE_VOTE.DENY}`)
-        .setLabel("Deny")
+        .setLabel("ปฏิเสธ")
         .setStyle(ButtonStyle.Danger)
         .setDisabled(disabled)
     )
@@ -294,34 +348,35 @@ function buildPartyConfirmationNotice(party) {
     .map((member) => `<@${member.user_id}>`)
     .join(" ")
 
-  return `${mentions}\nParty is full. Everyone please click "Confirm Party" on the recruitment post.`
+  return `${mentions}\nปาร์ตี้เต็มแล้ว. รบกวนทุกคนกดปุ่ม "ยืนยันปาร์ตี้" ที่โพสต์รับคน.`
 }
 
 function buildPartyActivationNotice(party) {
   const roleMention = party.party_role_id ? `<@&${party.party_role_id}>` : party.name
   const channelMention = party.party_channel_id ? `<#${party.party_channel_id}>` : "private party channel"
 
-  return `${roleMention} is now active. Your party room is ready at ${channelMention}.`
+  return `${roleMention} พร้อมแล้ว. ช่องของปาร์ตี้คุณคือ ${channelMention}.`
 }
 
 function buildScheduleLockedNotice(event) {
   const boardMention = event.board_channel_id ? `<#${event.board_channel_id}>` : "the schedule board"
-  return `Schedule locked for ${event.proposed_start_at}. A summary has been posted to ${boardMention}.`
+  return `ตารางนัดเวลาถูกล็อก ${event.proposed_start_at}. ตารางนัดเวลาถูกโพสต์ที่ ${boardMention}.`
 }
 
 function buildScheduleCancelledNotice(event) {
-  return `Schedule vote cancelled. Reason: ${event.cancelled_reason || "A member denied the proposed time."}`
+  return `ตารางนัดเวลาถูกยกเลิกแล้ว. เหตุผล: ${event.cancelled_reason || "มีสมาชิกไม่สะดวกสำหรับช่วงเวลานั้น."}`
 }
 
 module.exports = {
   buildClassSelectRow,
+  buildPartyCancelConfirmRows,
   buildJoinConfirmRows,
   buildPartyActionRows,
   buildPartyActivationNotice,
   buildPartyConfirmationNotice,
   buildPartyEmbed,
   buildScheduleActionRows,
-  buildScheduleBoardEmbed,
+  buildScheduleBoardOverviewEmbeds,
   buildScheduleCancelledNotice,
   buildScheduleEmbed,
   buildScheduleLockedNotice,

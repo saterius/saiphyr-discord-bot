@@ -40,6 +40,48 @@ async function getScheduleConfig(guildId) {
   )
 }
 
+async function getScheduleBoardState(guildId) {
+  requireValue(guildId, "guildId is required.")
+
+  return getOne(
+    db,
+    `
+      SELECT *
+      FROM guild_schedule_board_state
+      WHERE guild_id = ?
+    `,
+    [guildId]
+  )
+}
+
+async function getPartyChannelConfig(guildId) {
+  requireValue(guildId, "guildId is required.")
+
+  return getOne(
+    db,
+    `
+      SELECT *
+      FROM guild_party_channel_configs
+      WHERE guild_id = ?
+    `,
+    [guildId]
+  )
+}
+
+async function getPartyFinderConfig(guildId) {
+  requireValue(guildId, "guildId is required.")
+
+  return getOne(
+    db,
+    `
+      SELECT *
+      FROM guild_party_finder_configs
+      WHERE guild_id = ?
+    `,
+    [guildId]
+  )
+}
+
 async function setVoiceLobby({
   guildId,
   lobbyChannelId
@@ -136,11 +178,116 @@ async function clearScheduleBoard(guildId) {
   })
 }
 
+async function setPartyChannelCategory({
+  guildId,
+  categoryChannelId
+}) {
+  requireValue(guildId, "guildId is required.")
+  requireValue(categoryChannelId, "categoryChannelId is required.")
+
+  return withTransaction("write", async (tx) => {
+    await run(
+      tx,
+      `
+        INSERT INTO guild_party_channel_configs (guild_id, category_channel_id)
+        VALUES (?, ?)
+        ON CONFLICT (guild_id)
+        DO UPDATE SET
+          category_channel_id = excluded.category_channel_id,
+          updated_at = CURRENT_TIMESTAMP
+      `,
+      [guildId, categoryChannelId]
+    )
+
+    return getOne(
+      tx,
+      `
+        SELECT *
+        FROM guild_party_channel_configs
+        WHERE guild_id = ?
+      `,
+      [guildId]
+    )
+  })
+}
+
+async function setPartyFinderChannel({
+  guildId,
+  finderChannelId
+}) {
+  requireValue(guildId, "guildId is required.")
+  requireValue(finderChannelId, "finderChannelId is required.")
+
+  return withTransaction("write", async (tx) => {
+    await run(
+      tx,
+      `
+        INSERT INTO guild_party_finder_configs (guild_id, finder_channel_id)
+        VALUES (?, ?)
+        ON CONFLICT (guild_id)
+        DO UPDATE SET
+          finder_channel_id = excluded.finder_channel_id,
+          updated_at = CURRENT_TIMESTAMP
+      `,
+      [guildId, finderChannelId]
+    )
+
+    return getOne(
+      tx,
+      `
+        SELECT *
+        FROM guild_party_finder_configs
+        WHERE guild_id = ?
+      `,
+      [guildId]
+    )
+  })
+}
+
+async function setScheduleBoardMessage({
+  guildId,
+  boardMessageId
+}) {
+  requireValue(guildId, "guildId is required.")
+  requireValue(boardMessageId, "boardMessageId is required.")
+
+  return withTransaction("write", async (tx) => {
+    await run(
+      tx,
+      `
+        INSERT INTO guild_schedule_board_state (guild_id, board_message_id)
+        VALUES (?, ?)
+        ON CONFLICT (guild_id)
+        DO UPDATE SET
+          board_message_id = excluded.board_message_id,
+          updated_at = CURRENT_TIMESTAMP
+      `,
+      [guildId, boardMessageId]
+    )
+
+    return getOne(
+      tx,
+      `
+        SELECT *
+        FROM guild_schedule_board_state
+        WHERE guild_id = ?
+      `,
+      [guildId]
+    )
+  })
+}
+
 module.exports = {
   clearScheduleBoard,
   clearVoiceLobby,
+  getPartyChannelConfig,
+  getPartyFinderConfig,
+  getScheduleBoardState,
   getScheduleConfig,
   getVoiceConfig,
+  setPartyChannelCategory,
+  setPartyFinderChannel,
+  setScheduleBoardMessage,
   setScheduleBoard,
   setVoiceLobby
 }

@@ -13,6 +13,7 @@ const {
 } = require("../services/partyMessageService")
 const {
   buildClassSelectRow,
+  buildPartyCancelConfirmRows,
   buildJoinConfirmRows,
   getClassOption
 } = require("../utils/partyUi")
@@ -115,6 +116,58 @@ async function handlePartyButton(interaction) {
     await interaction.reply({
       content: `Party #${partyId} refreshed.`,
       flags: MessageFlags.Ephemeral
+    })
+
+    return true
+  }
+
+  if (action === "cancel") {
+    const partyId = Number(parts[0])
+    const party = await partyService.getPartyById(partyId)
+
+    if (party.leader_id !== interaction.user.id) {
+      throw new ServiceError(
+        "Only the party leader can cancel this party.",
+        "NOT_PARTY_LEADER",
+        { partyId, actorId: interaction.user.id }
+      )
+    }
+
+    await interaction.reply({
+      content: `Cancel party #${partyId} (${party.name})? This will close recruitment for everyone.`,
+      components: buildPartyCancelConfirmRows(partyId),
+      flags: MessageFlags.Ephemeral
+    })
+
+    return true
+  }
+
+  if (action === "cancel_confirm") {
+    const partyId = Number(parts[0])
+
+    await partyService.updatePartyStatus({
+      partyId,
+      actorId: interaction.user.id,
+      status: "cancelled",
+      reason: "Cancelled from recruitment post"
+    })
+
+    await refreshPartyRecruitmentMessage(interaction.client, partyId)
+
+    await interaction.update({
+      content: `Party #${partyId} has been cancelled.`,
+      components: [],
+    })
+
+    return true
+  }
+
+  if (action === "cancel_abort") {
+    const partyId = Number(parts[0])
+
+    await interaction.update({
+      content: `Party #${partyId} was not cancelled.`,
+      components: []
     })
 
     return true
