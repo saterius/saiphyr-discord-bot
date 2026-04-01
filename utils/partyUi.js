@@ -42,7 +42,6 @@ function renderScheduleWindow(event) {
   if (event.start_at_unix) {
     const startFull = renderDiscordTimestamp(event.start_at_unix, "F")
     const startRelative = renderDiscordTimestamp(event.start_at_unix, "R")
-
     return `${startFull}\n${startRelative}`
   }
 
