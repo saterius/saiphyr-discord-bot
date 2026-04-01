@@ -15,9 +15,12 @@ const {
 const {
   buildClassSelectRow,
   buildPartyCancelConfirmRows,
+  buildPartyFinishSuggestionRows,
   buildJoinConfirmRows,
   getClassOption
 } = require("../utils/partyUi")
+
+const activeButtonLocks = new Set()
 
 function createErrorReply(error) {
   if (error instanceof ServiceError) {
@@ -42,6 +45,90 @@ async function replyWithError(interaction, error) {
     content,
     flags: MessageFlags.Ephemeral
   }).catch(() => null)
+}
+
+function createButtonLockError(interaction) {
+  return new ServiceError(
+    "ปุ่มนี้กำลังอยู่ระหว่างการประมวลผล กรุณารอสักครู่",
+    "BUTTON_ACTION_IN_PROGRESS",
+    { customId: interaction.customId, userId: interaction.user?.id || null }
+  )
+}
+
+function getButtonLockKey(interaction) {
+  if (!interaction?.customId || !interaction?.user?.id) {
+    return null
+  }
+
+  const [scope, action, ...parts] = interaction.customId.split(":")
+
+  if (scope === "party") {
+    if (action === "join" && parts[0] === "start") {
+      return `party:join:start:${parts[1]}:${interaction.user.id}`
+    }
+
+    if (action === "join" && parts[0] === "confirm") {
+      return `party:join:confirm:${parts[1]}:${interaction.user.id}`
+    }
+
+    if (action === "confirm") {
+      return `party:confirm:${parts[0]}:${interaction.user.id}`
+    }
+
+    if (action === "refresh") {
+      return `party:refresh:${parts[0]}:${interaction.user.id}`
+    }
+
+    if (action === "close_recruitment") {
+      return `party:close_recruitment:${parts[0]}`
+    }
+
+    if (action === "cancel") {
+      return `party:cancel:${parts[0]}:${interaction.user.id}`
+    }
+
+    if (action === "cancel_confirm") {
+      return `party:cancel_confirm:${parts[0]}`
+    }
+
+    if (action === "cancel_abort") {
+      return `party:cancel_abort:${parts[0]}`
+    }
+
+    if (action === "finish_now") {
+      return `party:finish_now:${parts[0]}`
+    }
+
+    if (action === "finish_abort") {
+      return `party:finish_abort:${parts[0]}`
+    }
+  }
+
+  if (scope === "schedule" && action === "vote") {
+    return `schedule:vote:${parts[0]}:${interaction.user.id}`
+  }
+
+  return null
+}
+
+async function withButtonLock(interaction, handler) {
+  const lockKey = getButtonLockKey(interaction)
+
+  if (!lockKey) {
+    return handler()
+  }
+
+  if (activeButtonLocks.has(lockKey)) {
+    throw createButtonLockError(interaction)
+  }
+
+  activeButtonLocks.add(lockKey)
+
+  try {
+    return await handler()
+  } finally {
+    activeButtonLocks.delete(lockKey)
+  }
 }
 
 async function handlePartyButton(interaction) {
@@ -232,6 +319,11 @@ async function handlePartyButton(interaction) {
       )
     }
 
+    await interaction.editReply({
+      content: `กำลังเสร็จสิ้นปาร์ตี้ #${partyId} กรุณารอสักครู่...`,
+      components: buildPartyFinishSuggestionRows(partyId, { disabled: true })
+    })
+
     const guild = interaction.client.guilds.cache.get(party.guild_id)
       || await interaction.client.guilds.fetch(party.guild_id).catch(() => null)
 
@@ -347,13 +439,17 @@ async function handleScheduleButton(interaction) {
 async function handleComponentInteraction(interaction) {
   try {
     if (interaction.isButton()) {
-      if (interaction.customId.startsWith("party:")) {
-        return await handlePartyButton(interaction)
-      }
+      return await withButtonLock(interaction, async () => {
+        if (interaction.customId.startsWith("party:")) {
+          return await handlePartyButton(interaction)
+        }
 
-      if (interaction.customId.startsWith("schedule:")) {
-        return await handleScheduleButton(interaction)
-      }
+        if (interaction.customId.startsWith("schedule:")) {
+          return await handleScheduleButton(interaction)
+        }
+
+        return false
+      })
     }
 
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith("party:")) {
