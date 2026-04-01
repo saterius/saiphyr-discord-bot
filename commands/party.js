@@ -5,6 +5,9 @@ const {
 } = require("discord.js")
 
 const partyService = require("../services/partyService")
+const {
+  createPartyCalculation
+} = require("../services/partyCalculationService")
 const { finishParty } = require("../services/partyLifecycleService")
 const {
   getPartyChannelConfig,
@@ -517,17 +520,48 @@ module.exports = {
 
       const perMember = netTotal / memberCount
       const stampBonus = stampCount > 0 ? stampCost / memberCount : 0
+      const currentParty = await partyService.getPartyByChannelId(interaction.channelId).catch(() => null)
+      const roleMention = currentParty?.party_role_id ? `<@&${currentParty.party_role_id}>` : null
+      const content = [
+        roleMention,
+        "สรุปยอดเงินปาร์ตี้",
+        `รายการเงิน: ${amounts.join(" + ")} = ${formatGold(grossTotal)}`,
+        `ค่าสแตมป์: ${stampCount} x 2 = ${formatGold(stampCost)}`,
+        `เงินหลังหักค่าสแตมป์: ${formatGold(netTotal)}`,
+        `หาร ${memberCount} คน = ${formatGold(perMember)} / คน`,
+        stampCount > 0
+          ? `คนที่ออกสแตมป์จะดึงเพิ่มได้ ${formatGold(stampBonus)}`
+          : "ไม่มีค่าสแตมป์ที่ต้องชดเชยเพิ่ม",
+        "",
+        `ถ้าตรวจสอบยอดเรียบร้อยแล้ว ให้สมาชิกกดรีแอค ✅ ให้ครบ ${memberCount} คน`
+      ].filter(Boolean).join("\n")
+
+      const message = await interaction.channel.send({
+        content,
+        allowedMentions: roleMention
+          ? { roles: [currentParty.party_role_id] }
+          : undefined
+      })
+
+      await message.react("✅").catch(() => null)
+
+      if (currentParty) {
+        await createPartyCalculation({
+          partyId: currentParty.id,
+          creatorId: interaction.user.id,
+          channelId: interaction.channelId,
+          messageId: message.id,
+          amountsText: amounts.join("+"),
+          grossTotal,
+          stampCount,
+          stampCost,
+          netTotal,
+          memberCount
+        })
+      }
 
       await interaction.reply({
-        content: [
-          `รายการเงิน: ${amounts.join(" + ")} = ${formatGold(grossTotal)}`,
-          `ค่าสแตมป์: ${stampCount} x 2 = ${formatGold(stampCost)}`,
-          `เงินหลังหักค่าสแตมป์: ${formatGold(netTotal)}`,
-          `หาร ${memberCount} คน = ${formatGold(perMember)} / คน`,
-          stampCount > 0
-            ? `คนที่ออกสแตมป์จะดึงเพิ่มได้ ${formatGold(stampBonus)} / คนสแตมป์`
-            : "ไม่มีค่าสแตมป์ที่ต้องชดเชยเพิ่ม"
-        ].join("\n"),
+        content: "โพสต์สรุปยอดเงินถูกส่งไว้ในห้องนี้แล้ว",
         flags: MessageFlags.Ephemeral
       })
 

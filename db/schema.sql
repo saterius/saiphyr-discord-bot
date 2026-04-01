@@ -16,6 +16,7 @@
 -- 42_schedule_event_times.sql
 -- 50_schedule_votes.sql
 -- 60_party_logs.sql
+-- 70_party_calculations.sql
 -- 90_triggers.sql
 -- 95_guild_voice_triggers.sql
 -- 96_guild_schedule_triggers.sql
