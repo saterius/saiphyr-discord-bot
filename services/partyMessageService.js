@@ -19,8 +19,16 @@ const {
   buildScheduleLockedNotice
 } = require("../utils/partyUi")
 
-async function fetchTextChannel(client, channelId) {
+async function fetchTextChannel(client, channelId, fallbackChannel = null) {
   if (!channelId) {
+    return null
+  }
+
+  if (fallbackChannel?.id === channelId) {
+    return fallbackChannel
+  }
+
+  if (!client?.channels?.fetch) {
     return null
   }
 
@@ -191,9 +199,9 @@ async function announceCancelledSchedule(client, eventId) {
   return event
 }
 
-async function sendPartyFinishSuggestion(client, partyId) {
+async function sendPartyFinishSuggestion(client, partyId, fallbackChannel = null) {
   const party = await partyService.getPartyById(partyId)
-  const channel = await fetchTextChannel(client, party.party_channel_id)
+  const channel = await fetchTextChannel(client, party.party_channel_id, fallbackChannel)
 
   if (!channel || !channel.isTextBased()) {
     return null
