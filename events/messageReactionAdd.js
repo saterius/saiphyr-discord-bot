@@ -3,6 +3,7 @@ const {
   markSuggestionSent
 } = require("../services/partyCalculationService")
 const partyService = require("../services/partyService")
+const { PARTY_TYPE } = require("../services/partyConstants")
 const { sendPartyFinishSuggestion } = require("../services/partyMessageService")
 
 module.exports = {
@@ -30,6 +31,10 @@ module.exports = {
 
       const party = await partyService.getPartyById(calculation.party_id).catch(() => null)
       if (!party || party.party_channel_id !== reaction.message.channelId) {
+        return
+      }
+
+      if (party.party_type !== PARTY_TYPE.AD_HOC) {
         return
       }
 
