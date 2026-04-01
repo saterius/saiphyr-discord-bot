@@ -137,6 +137,28 @@ async function handlePartyButton(interaction) {
     return true
   }
 
+  if (action === "close_recruitment") {
+    const partyId = Number(parts[0])
+
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+
+    const result = await partyService.closePartyRecruitment({
+      partyId,
+      actorId: interaction.user.id
+    })
+
+    await refreshPartyRecruitmentMessage(interaction.client, partyId)
+    await sendPartyConfirmationPrompt(interaction.client, partyId)
+
+    await interaction.editReply({
+      content: `ปาร์ตี้ #${partyId} ปิดรับสมัครแล้ว และส่งคำขอยืนยันให้สมาชิกทั้ง ${result.party.active_member_count} คนเรียบร้อย`
+    })
+
+    return true
+  }
+
   if (action === "cancel") {
     const partyId = Number(parts[0])
 

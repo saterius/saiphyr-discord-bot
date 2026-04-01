@@ -207,6 +207,7 @@ function buildPartyActionRows(party) {
     .includes(party.status)
   const joinDisabled = isClosed || party.status !== PARTY_STATUS.RECRUITING
   const confirmDisabled = party.status !== PARTY_STATUS.PENDING_CONFIRM
+  const closeRecruitmentDisabled = party.status !== PARTY_STATUS.RECRUITING
   const cancelDisabled = [PARTY_STATUS.CLOSED, PARTY_STATUS.CANCELLED].includes(party.status)
 
   const actionRow = new ActionRowBuilder().addComponents(
@@ -224,6 +225,11 @@ function buildPartyActionRows(party) {
       .setCustomId(`party:refresh:${party.id}`)
       .setLabel("รีเฟรช")
       .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`party:close_recruitment:${party.id}`)
+      .setLabel("ปิดรับสมัคร")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(closeRecruitmentDisabled),
     new ButtonBuilder()
       .setCustomId(`party:cancel:${party.id}`)
       .setLabel("ยกเลิกปาร์ตี้")
@@ -415,7 +421,7 @@ function buildPartyConfirmationNotice(party) {
     .map((member) => `<@${member.user_id}>`)
     .join(" ")
 
-  return `${mentions}\nปาร์ตี้เต็มแล้ว. รบกวนทุกคนกดปุ่ม "ยืนยันปาร์ตี้" ที่โพสต์รับคน.`
+  return `${mentions}\nรบกวนสมาชิกทุกคนกดปุ่ม "ยืนยันปาร์ตี้" ที่โพสต์รับคน เพื่อเริ่มจัดตั้งปาร์ตี้.`
 }
 
 function buildPartyActivationNotice(party) {
