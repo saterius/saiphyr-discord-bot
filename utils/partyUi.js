@@ -1,4 +1,4 @@
-const {
+﻿const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
@@ -42,7 +42,7 @@ function renderScheduleWindow(event) {
   if (event.start_at_unix) {
     const startFull = renderDiscordTimestamp(event.start_at_unix, "F")
     const startRelative = renderDiscordTimestamp(event.start_at_unix, "R")
-    return `${startFull}\n${startRelative}`
+    return `${startFull} (${startRelative})`
   }
 
   return event.proposed_start_at || "-"
@@ -53,7 +53,7 @@ function renderPartyPlannedTime(party) {
     return "-"
   }
 
-  return `${renderDiscordTimestamp(party.planned_start_at_unix, "F")}\n${renderDiscordTimestamp(party.planned_start_at_unix, "R")}`
+  return `${renderDiscordTimestamp(party.planned_start_at_unix, "F")} (${renderDiscordTimestamp(party.planned_start_at_unix, "R")})`
 }
 
 function partyStatusLabel(status) {
@@ -459,8 +459,12 @@ function buildPartyConfirmationNotice(party) {
     .filter((member) => ["joined", "confirmed"].includes(member.join_status))
     .map((member) => `<@${member.user_id}>`)
     .join(" ")
+  const jumpUrl = party.guild_id && party.recruit_channel_id && party.recruit_message_id
+    ? `https://discord.com/channels/${party.guild_id}/${party.recruit_channel_id}/${party.recruit_message_id}`
+    : null
+  const jumpLine = jumpUrl ? `\nกดกลับไปที่โพสต์รับคนได้ที่นี่: ${jumpUrl}` : ""
 
-  return `${mentions}\nรบกวนสมาชิกทุกคนกดปุ่ม "ยืนยันปาร์ตี้" ที่โพสต์รับคน เพื่อเริ่มจัดตั้งปาร์ตี้.`
+  return `${mentions}\nรบกวนสมาชิกทุกคนกดปุ่ม "ยืนยันปาร์ตี้" ที่โพสต์รับคน เพื่อเริ่มจัดตั้งปาร์ตี้.${jumpLine}`
 }
 
 function buildPartyActivationNotice(party) {
