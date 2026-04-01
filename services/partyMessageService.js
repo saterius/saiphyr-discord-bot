@@ -11,6 +11,7 @@ const {
   buildPartyActivationNotice,
   buildPartyConfirmationNotice,
   buildPartyEmbed,
+  buildPartyFinishSuggestionRows,
   buildScheduleActionRows,
   buildScheduleBoardOverviewEmbeds,
   buildScheduleCancelledNotice,
@@ -190,12 +191,33 @@ async function announceCancelledSchedule(client, eventId) {
   return event
 }
 
+async function sendPartyFinishSuggestion(client, partyId) {
+  const party = await partyService.getPartyById(partyId)
+  const channel = await fetchTextChannel(client, party.party_channel_id)
+
+  if (!channel || !channel.isTextBased()) {
+    return null
+  }
+
+  return channel.send({
+    content: [
+      `<@${party.leader_id}> สมาชิกกด ✅ ครบตามจำนวนคนในโพสต์สรุปยอดเงินแล้ว`,
+      "ถ้าทุกอย่างเรียบร้อยแล้ว สามารถกดปุ่มด้านล่างเพื่อเสร็จสิ้นปาร์ตี้ได้ทันที หรือใช้ /party finish ในห้องนี้ก็ได้"
+    ].join("\n"),
+    components: buildPartyFinishSuggestionRows(partyId),
+    allowedMentions: {
+      users: [party.leader_id]
+    }
+  }).catch(() => null)
+}
+
 module.exports = {
   announceCancelledSchedule,
   postLockedScheduleBoardEntry,
   provisionPartyAndAnnounce,
   refreshPartyRecruitmentMessage,
   refreshScheduleVoteMessage,
+  sendPartyFinishSuggestion,
   sendPartyConfirmationPrompt,
   syncGuildScheduleBoard
 }

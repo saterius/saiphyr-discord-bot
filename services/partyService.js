@@ -206,6 +206,32 @@ async function syncPartyRosterState(executor, partyId) {
   return PARTY_STATUS.RECRUITING
 }
 
+async function closeRecruitmentForConfirmation(executor, partyId) {
+  const stats = await getPartyStats(executor, partyId)
+
+  if (stats.activeMemberCount <= 0) {
+    throw new ServiceError(
+      "ปาร์ตี้ต้องมีอย่างน้อย 1 คนก่อนปิดรับสมัคร.",
+      "PARTY_EMPTY",
+      { partyId }
+    )
+  }
+
+  await seedPendingConfirmations(executor, partyId)
+  await run(
+    executor,
+    `
+      UPDATE parties
+      SET status = ?,
+          locked_at = NULL
+      WHERE id = ?
+    `,
+    [PARTY_STATUS.PENDING_CONFIRM, partyId]
+  )
+
+  return PARTY_STATUS.PENDING_CONFIRM
+}
+
 async function loadPartyMembers(executor, partyId) {
   return getMany(
     executor,
@@ -613,8 +639,8 @@ async function respondPartyConfirmation({
 
     if (
       response === CONFIRMATION_RESPONSE.ACCEPTED &&
-      stats.activeMemberCount === stats.maxMembers &&
-      confirmations.acceptedCount === stats.maxMembers
+      stats.activeMemberCount > 0 &&
+      confirmations.acceptedCount === stats.activeMemberCount
     ) {
       await run(
         tx,
@@ -648,6 +674,49 @@ async function respondPartyConfirmation({
     return {
       party: await loadPartyDetails(tx, partyId),
       partyActivated
+    }
+  })
+}
+
+async function closePartyRecruitment({
+  partyId,
+  actorId
+}) {
+  requireValue(partyId, "partyId is required.")
+  requireValue(actorId, "actorId is required.")
+
+  return withTransaction("write", async (tx) => {
+    const party = await getPartyRecord(tx, partyId)
+    ensurePartyOpenForRosterChanges(party)
+
+    if (party.leader_id !== actorId) {
+      throw new ServiceError(
+        "หัวหน้าปาร์ตี้เท่านั้นที่จะปิดรับสมัครสมาชิกก่อนได้.",
+        "NOT_PARTY_LEADER",
+        { partyId, actorId }
+      )
+    }
+
+    if (party.status !== PARTY_STATUS.RECRUITING) {
+      throw new ServiceError(
+        "การรับสมัครสมาชิกปาร์ตี้สามารถปิดได้เมื่ออยู่ในสถานะกำลังหาคนอยู่เท่านั้น.",
+        "PARTY_NOT_RECRUITING",
+        { partyId, status: party.status }
+      )
+    }
+
+    const nextStatus = await closeRecruitmentForConfirmation(tx, partyId)
+
+    await insertPartyLog(tx, {
+      partyId,
+      actorId,
+      action: "recruitment_closed_early",
+      meta: { nextStatus }
+    })
+
+    return {
+      party: await loadPartyDetails(tx, partyId),
+      nextStatus
     }
   })
 }
@@ -892,6 +961,7 @@ async function updatePartyStatus({
 }
 
 module.exports = {
+  closePartyRecruitment,
   createParty,
   getPartyByChannelId,
   getPartyById,

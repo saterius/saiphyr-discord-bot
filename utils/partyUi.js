@@ -72,6 +72,54 @@ function partyStatusLabel(status) {
   return labels[status] || status
 }
 
+function partyStatusMeta(status) {
+  const meta = {
+    [PARTY_STATUS.RECRUITING]: {
+      emoji: "🟢",
+      color: 0x2f9e44,
+      titlePrefix: "กำลังหา",
+      highlight: "กำลังเปิดรับสมาชิก"
+    },
+    [PARTY_STATUS.PENDING_CONFIRM]: {
+      emoji: "🟡",
+      color: 0xf08c00,
+      titlePrefix: "รอยืนยัน",
+      highlight: "สมาชิกครบแล้ว รอทุกคนกดยืนยัน"
+    },
+    [PARTY_STATUS.ACTIVE]: {
+      emoji: "🔵",
+      color: 0x1c7ed6,
+      titlePrefix: "พร้อมลุย",
+      highlight: "ปาร์ตี้พร้อมใช้งานแล้ว"
+    },
+    [PARTY_STATUS.SCHEDULED]: {
+      emoji: "🗓️",
+      color: 0x1971c2,
+      titlePrefix: "นัดแล้ว",
+      highlight: "ปาร์ตี้นี้มีเวลานัดเรียบร้อยแล้ว"
+    },
+    [PARTY_STATUS.CLOSED]: {
+      emoji: "⚫",
+      color: 0x495057,
+      titlePrefix: "ปิดแล้ว",
+      highlight: "ปาร์ตี้นี้ปิดรับแล้ว"
+    },
+    [PARTY_STATUS.CANCELLED]: {
+      emoji: "🔴",
+      color: 0xe03131,
+      titlePrefix: "ยกเลิก",
+      highlight: "ปาร์ตี้นี้ถูกยกเลิกแล้ว"
+    }
+  }
+
+  return meta[status] || {
+    emoji: "ℹ️",
+    color: 0x495057,
+    titlePrefix: "ปาร์ตี้",
+    highlight: partyStatusLabel(status)
+  }
+}
+
 function scheduleStatusLabel(status) {
   const labels = {
     [SCHEDULE_STATUS.VOTING]: "กำลังโหวต",
@@ -107,10 +155,11 @@ function buildPartyEmbed(party) {
   const memberLines = party.members?.length
     ? party.members.map(formatMember).join("\n")
     : "No members yet."
+  const statusMeta = partyStatusMeta(party.status)
   const fields = [
     {
       name: "สถานะ",
-      value: partyStatusLabel(party.status),
+      value: `${statusMeta.emoji} ${partyStatusLabel(party.status)}`,
       inline: true
     },
     {
@@ -144,9 +193,12 @@ function buildPartyEmbed(party) {
   })
 
   return new EmbedBuilder()
-    .setTitle(`Party: ${party.name}`)
-    .setDescription(party.description || "Dragon Nest party recruitment")
-    .setColor(0x2b8a3e)
+    .setTitle(`${statusMeta.emoji} ${statusMeta.titlePrefix}: ${party.name}`)
+    .setDescription([
+      `**${statusMeta.highlight}**`,
+      party.description || "กำลังรับสมัครสมาชิกปาร์ตี้"
+    ].filter(Boolean).join("\n"))
+    .setColor(statusMeta.color)
     .addFields(fields)
 }
 
@@ -155,6 +207,7 @@ function buildPartyActionRows(party) {
     .includes(party.status)
   const joinDisabled = isClosed || party.status !== PARTY_STATUS.RECRUITING
   const confirmDisabled = party.status !== PARTY_STATUS.PENDING_CONFIRM
+  const closeRecruitmentDisabled = party.status !== PARTY_STATUS.RECRUITING
   const cancelDisabled = [PARTY_STATUS.CLOSED, PARTY_STATUS.CANCELLED].includes(party.status)
 
   const actionRow = new ActionRowBuilder().addComponents(
@@ -172,6 +225,11 @@ function buildPartyActionRows(party) {
       .setCustomId(`party:refresh:${party.id}`)
       .setLabel("รีเฟรช")
       .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`party:close_recruitment:${party.id}`)
+      .setLabel("ปิดรับสมัคร")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(closeRecruitmentDisabled),
     new ButtonBuilder()
       .setCustomId(`party:cancel:${party.id}`)
       .setLabel("ยกเลิกปาร์ตี้")
@@ -221,6 +279,21 @@ function buildPartyCancelConfirmRows(partyId) {
       new ButtonBuilder()
         .setCustomId(`party:cancel_abort:${partyId}`)
         .setLabel("เก็บปาร์ตี้ไว้")
+        .setStyle(ButtonStyle.Secondary)
+    )
+  ]
+}
+
+function buildPartyFinishSuggestionRows(partyId) {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`party:finish_now:${partyId}`)
+        .setLabel("เสร็จสิ้น")
+        .setStyle(ButtonStyle.Danger),
+      new ButtonBuilder()
+        .setCustomId(`party:finish_abort:${partyId}`)
+        .setLabel("ไว้ทีหลัง")
         .setStyle(ButtonStyle.Secondary)
     )
   ]
@@ -348,7 +421,7 @@ function buildPartyConfirmationNotice(party) {
     .map((member) => `<@${member.user_id}>`)
     .join(" ")
 
-  return `${mentions}\nปาร์ตี้เต็มแล้ว. รบกวนทุกคนกดปุ่ม "ยืนยันปาร์ตี้" ที่โพสต์รับคน.`
+  return `${mentions}\nรบกวนสมาชิกทุกคนกดปุ่ม "ยืนยันปาร์ตี้" ที่โพสต์รับคน เพื่อเริ่มจัดตั้งปาร์ตี้.`
 }
 
 function buildPartyActivationNotice(party) {
@@ -375,6 +448,7 @@ module.exports = {
   buildPartyActivationNotice,
   buildPartyConfirmationNotice,
   buildPartyEmbed,
+  buildPartyFinishSuggestionRows,
   buildScheduleActionRows,
   buildScheduleBoardOverviewEmbeds,
   buildScheduleCancelledNotice,

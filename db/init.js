@@ -8,10 +8,16 @@ const db = require("./client")
 const schemaDir = path.join(__dirname, "schema")
 
 function schemaSort(a, b) {
-  return a.localeCompare(b, undefined, {
-    numeric: true,
-    sensitivity: "base"
-  })
+  const matchA = a.match(/^(\d+)/)
+  const matchB = b.match(/^(\d+)/)
+  const orderA = matchA ? Number(matchA[1]) : Number.MAX_SAFE_INTEGER
+  const orderB = matchB ? Number(matchB[1]) : Number.MAX_SAFE_INTEGER
+
+  if (orderA !== orderB) {
+    return orderA - orderB
+  }
+
+  return a.localeCompare(b, undefined, { sensitivity: "base" })
 }
 
 async function columnExists(tableName, columnName) {

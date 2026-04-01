@@ -2,6 +2,7 @@ const { MessageFlags } = require("discord.js")
 
 const partyService = require("../services/partyService")
 const scheduleService = require("../services/scheduleService")
+const { finishParty } = require("../services/partyLifecycleService")
 const ServiceError = require("../services/serviceError")
 const {
   announceCancelledSchedule,
@@ -48,12 +49,16 @@ async function handlePartyButton(interaction) {
 
   if (action === "join" && parts[0] === "start") {
     const partyId = Number(parts[1])
+
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+
     const party = await partyService.getPartyById(partyId)
 
-    await interaction.reply({
+    await interaction.editReply({
       content: `เลือกอาชีพสำหรับปาร์ตี้ #${partyId} (${party.name}).`,
-      components: [buildClassSelectRow(partyId)],
-      flags: MessageFlags.Ephemeral
+      components: [buildClassSelectRow(partyId)]
     })
 
     return true
@@ -63,6 +68,9 @@ async function handlePartyButton(interaction) {
     const partyId = Number(parts[1])
     const classKey = parts[2]
     const classOption = getClassOption(classKey)
+
+    await interaction.deferUpdate()
+
     const result = await partyService.joinParty({
       partyId,
       userId: interaction.user.id,
@@ -76,8 +84,8 @@ async function handlePartyButton(interaction) {
       await sendPartyConfirmationPrompt(interaction.client, partyId)
     }
 
-    await interaction.update({
-      content: `คุณได้เข้าร่วมปาร์ตี้ #${partyId} ด้วอาชีพ ${classOption?.label || classKey}.`,
+    await interaction.editReply({
+      content: `คุณได้เข้าร่วมปาร์ตี้ #${partyId} ด้วยอาชีพ ${classOption?.label || classKey}.`,
       components: []
     })
 
@@ -86,6 +94,11 @@ async function handlePartyButton(interaction) {
 
   if (action === "confirm") {
     const partyId = Number(parts[0])
+
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+
     const result = await partyService.respondPartyConfirmation({
       partyId,
       userId: interaction.user.id,
@@ -101,9 +114,8 @@ async function handlePartyButton(interaction) {
 
     await refreshPartyRecruitmentMessage(interaction.client, partyId)
 
-    await interaction.reply({
-      content: `การยืนยันสำหรับปาร์ตี้ #${partyId}.${activeNotice} ถูกบันทึกแล้ว`,
-      flags: MessageFlags.Ephemeral
+    await interaction.editReply({
+      content: `การยืนยันสำหรับปาร์ตี้ #${partyId}${activeNotice} ถูกบันทึกแล้ว`
     })
 
     return true
@@ -111,11 +123,37 @@ async function handlePartyButton(interaction) {
 
   if (action === "refresh") {
     const partyId = Number(parts[0])
+
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+
     await refreshPartyRecruitmentMessage(interaction.client, partyId)
 
-    await interaction.reply({
-      content: `ปาร์ตี้ #${partyId} ถูกรีเฟรช.`,
+    await interaction.editReply({
+      content: `ปาร์ตี้ #${partyId} ถูกรีเฟรช.`
+    })
+
+    return true
+  }
+
+  if (action === "close_recruitment") {
+    const partyId = Number(parts[0])
+
+    await interaction.deferReply({
       flags: MessageFlags.Ephemeral
+    })
+
+    const result = await partyService.closePartyRecruitment({
+      partyId,
+      actorId: interaction.user.id
+    })
+
+    await refreshPartyRecruitmentMessage(interaction.client, partyId)
+    await sendPartyConfirmationPrompt(interaction.client, partyId)
+
+    await interaction.editReply({
+      content: `ปาร์ตี้ #${partyId} ปิดรับสมัครแล้ว และส่งคำขอยืนยันให้สมาชิกทั้ง ${result.party.active_member_count} คนเรียบร้อย`
     })
 
     return true
@@ -123,6 +161,11 @@ async function handlePartyButton(interaction) {
 
   if (action === "cancel") {
     const partyId = Number(parts[0])
+
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+
     const party = await partyService.getPartyById(partyId)
 
     if (party.leader_id !== interaction.user.id) {
@@ -133,10 +176,9 @@ async function handlePartyButton(interaction) {
       )
     }
 
-    await interaction.reply({
+    await interaction.editReply({
       content: `ยกเลิกปาร์ตี้ #${partyId} (${party.name})? การกระทำนี้จะปิดรับการสมัครสมาชิก.`,
-      components: buildPartyCancelConfirmRows(partyId),
-      flags: MessageFlags.Ephemeral
+      components: buildPartyCancelConfirmRows(partyId)
     })
 
     return true
@@ -144,6 +186,8 @@ async function handlePartyButton(interaction) {
 
   if (action === "cancel_confirm") {
     const partyId = Number(parts[0])
+
+    await interaction.deferUpdate()
 
     await partyService.updatePartyStatus({
       partyId,
@@ -154,9 +198,9 @@ async function handlePartyButton(interaction) {
 
     await refreshPartyRecruitmentMessage(interaction.client, partyId)
 
-    await interaction.update({
+    await interaction.editReply({
       content: `ปาร์ตี้ #${partyId} ถูกยกเลิกแล้ว.`,
-      components: [],
+      components: []
     })
 
     return true
@@ -167,6 +211,68 @@ async function handlePartyButton(interaction) {
 
     await interaction.update({
       content: `ปาร์ตี้ #${partyId} ยังไม่ได้ถูกยกเลิก.`,
+      components: []
+    })
+
+    return true
+  }
+
+  if (action === "finish_now") {
+    const partyId = Number(parts[0])
+
+    await interaction.deferUpdate()
+
+    const party = await partyService.getPartyById(partyId)
+
+    if (party.leader_id !== interaction.user.id) {
+      throw new ServiceError(
+        "หัวหน้าปาร์ตี้เท่านั้นที่จบปาร์ตี้ได้.",
+        "NOT_PARTY_LEADER",
+        { partyId, actorId: interaction.user.id }
+      )
+    }
+
+    const guild = interaction.client.guilds.cache.get(party.guild_id)
+      || await interaction.client.guilds.fetch(party.guild_id).catch(() => null)
+
+    if (!guild) {
+      throw new ServiceError(
+        "ไม่พบกิลด์ของปาร์ตี้นี้ในตอนนี้",
+        "GUILD_NOT_FOUND",
+        { partyId, guildId: party.guild_id }
+      )
+    }
+
+    const result = await finishParty({
+      guild,
+      partyId,
+      actorId: interaction.user.id,
+      reason: "จบปาร์ตี้จากข้อความแนะนำหลังสมาชิกกดยืนยันยอดครบ"
+    })
+
+    await refreshPartyRecruitmentMessage(interaction.client, partyId)
+
+    const deletedBits = []
+    if (result.removedRole) {
+      deletedBits.push("ลบยศแล้ว")
+    }
+    if (result.removedChannel) {
+      deletedBits.push("ลบห้องแล้ว")
+    }
+
+    await interaction.editReply({
+      content: `ปาร์ตี้ #${partyId} จบแล้ว${deletedBits.length ? ` (${deletedBits.join(", ")})` : ""}`,
+      components: []
+    })
+
+    return true
+  }
+
+  if (action === "finish_abort") {
+    const partyId = Number(parts[0])
+
+    await interaction.update({
+      content: `เก็บปาร์ตี้ #${partyId} ไว้ก่อน ตอนพร้อมค่อยใช้ /party finish ได้เสมอ`,
       components: []
     })
 
@@ -203,6 +309,11 @@ async function handleScheduleButton(interaction) {
   }
 
   const eventId = Number(eventIdValue)
+
+  await interaction.deferReply({
+    flags: MessageFlags.Ephemeral
+  })
+
   const result = await scheduleService.voteOnSchedule({
     eventId,
     userId: interaction.user.id,
@@ -217,9 +328,8 @@ async function handleScheduleButton(interaction) {
     await announceCancelledSchedule(interaction.client, eventId)
   }
 
-  await interaction.reply({
-    content: `Your vote for schedule #${eventId} was recorded as ${vote}.`,
-    flags: MessageFlags.Ephemeral
+  await interaction.editReply({
+    content: `Your vote for schedule #${eventId} was recorded as ${vote}.`
   })
 
   return true
