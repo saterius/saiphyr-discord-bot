@@ -7,6 +7,13 @@ const db = require("./client")
 
 const schemaDir = path.join(__dirname, "schema")
 
+function schemaSort(a, b) {
+  return a.localeCompare(b, undefined, {
+    numeric: true,
+    sensitivity: "base"
+  })
+}
+
 async function columnExists(tableName, columnName) {
   const result = await db.execute(`PRAGMA table_info(${tableName})`)
   return result.rows.some((row) => row.name === columnName)
@@ -16,7 +23,7 @@ async function loadSchemaFiles() {
   const files = fs
     .readdirSync(schemaDir)
     .filter((file) => file.endsWith(".sql"))
-    .sort((a, b) => a.localeCompare(b))
+    .sort(schemaSort)
 
   return files.map((file) => ({
     name: file,
