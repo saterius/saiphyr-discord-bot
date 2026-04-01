@@ -7,6 +7,11 @@ const db = require("./client")
 
 const schemaDir = path.join(__dirname, "schema")
 
+async function columnExists(tableName, columnName) {
+  const result = await db.execute(`PRAGMA table_info(${tableName})`)
+  return result.rows.some((row) => row.name === columnName)
+}
+
 async function loadSchemaFiles() {
   const files = fs
     .readdirSync(schemaDir)
@@ -22,6 +27,24 @@ async function loadSchemaFiles() {
 async function applySchemaFile(file) {
   if (!file.sql) {
     return
+  }
+
+  if (file.name === "11_party_type_migration.sql") {
+    const alreadyExists = await columnExists("parties", "party_type")
+    if (alreadyExists) {
+      console.log(`Skipping ${file.name} (party_type already exists).`)
+      return
+    }
+  }
+
+  if (file.name === "12_party_planned_time_migration.sql") {
+    const hasPlannedStart = await columnExists("parties", "planned_start_at_unix")
+    const hasPlannedTimezone = await columnExists("parties", "planned_timezone")
+
+    if (hasPlannedStart && hasPlannedTimezone) {
+      console.log(`Skipping ${file.name} (planned time columns already exist).`)
+      return
+    }
   }
 
   console.log(`Applying ${file.name}...`)

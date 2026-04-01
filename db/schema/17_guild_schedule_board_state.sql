@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS guild_schedule_board_state (
+  guild_id TEXT PRIMARY KEY,
+  board_message_id TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

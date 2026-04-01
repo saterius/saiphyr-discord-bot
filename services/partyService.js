@@ -9,7 +9,8 @@ const ServiceError = require("./serviceError")
 const {
   CONFIRMATION_RESPONSE,
   MEMBER_STATUS,
-  PARTY_STATUS
+  PARTY_STATUS,
+  PARTY_TYPE
 } = require("./partyConstants")
 
 const ACTIVE_MEMBER_STATUSES = [MEMBER_STATUS.JOINED, MEMBER_STATUS.CONFIRMED]
@@ -289,6 +290,9 @@ async function createParty({
   leaderId,
   name,
   description = null,
+  partyType = PARTY_TYPE.AD_HOC,
+  plannedStartAtUnix = null,
+  plannedTimezone = null,
   recruitChannelId = null,
   recruitMessageId = null,
   maxMembers = 8,
@@ -302,6 +306,10 @@ async function createParty({
     throw new ServiceError("maxMembers must be a positive integer.", "VALIDATION_ERROR")
   }
 
+  if (!Object.values(PARTY_TYPE).includes(partyType)) {
+    throw new ServiceError("Invalid party type.", "VALIDATION_ERROR", { partyType })
+  }
+
   return withTransaction("write", async (tx) => {
     const result = await run(
       tx,
@@ -313,12 +321,27 @@ async function createParty({
           recruit_message_id,
           name,
           description,
+          party_type,
+          planned_start_at_unix,
+          planned_timezone,
           max_members,
           auto_close_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      [guildId, leaderId, recruitChannelId, recruitMessageId, name, description, maxMembers, autoCloseAt]
+      [
+        guildId,
+        leaderId,
+        recruitChannelId,
+        recruitMessageId,
+        name,
+        description,
+        partyType,
+        plannedStartAtUnix,
+        plannedTimezone,
+        maxMembers,
+        autoCloseAt
+      ]
     )
 
     const partyId = result.lastInsertRowid
@@ -327,7 +350,7 @@ async function createParty({
       partyId,
       actorId: leaderId,
       action: "party_created",
-      meta: { name, maxMembers }
+      meta: { name, maxMembers, partyType, plannedStartAtUnix, plannedTimezone }
     })
 
     return loadPartyDetails(tx, partyId)
@@ -350,6 +373,27 @@ async function getPartyByRecruitMessageId(recruitMessageId) {
       LIMIT 1
     `,
     [recruitMessageId]
+  )
+
+  if (!party) {
+    return null
+  }
+
+  return loadPartyDetails(db, party.id)
+}
+
+async function getPartyByChannelId(channelId) {
+  requireValue(channelId, "channelId is required.")
+
+  const party = await getOne(
+    db,
+    `
+      SELECT id
+      FROM parties
+      WHERE party_channel_id = ?
+      LIMIT 1
+    `,
+    [channelId]
   )
 
   if (!party) {
@@ -888,6 +932,7 @@ async function updatePartyStatus({
 
 module.exports = {
   createParty,
+  getPartyByChannelId,
   getPartyById,
   getPartyByRecruitMessageId,
   joinParty,

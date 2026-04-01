@@ -2,12 +2,17 @@ const partyService = require("./partyService")
 const scheduleService = require("./scheduleService")
 const { provisionPartyResources } = require("./partyProvisioningService")
 const {
+  getScheduleBoardState,
+  getScheduleConfig,
+  setScheduleBoardMessage
+} = require("./guildConfigService")
+const {
   buildPartyActionRows,
   buildPartyActivationNotice,
   buildPartyConfirmationNotice,
   buildPartyEmbed,
   buildScheduleActionRows,
-  buildScheduleBoardEmbed,
+  buildScheduleBoardOverviewEmbeds,
   buildScheduleCancelledNotice,
   buildScheduleEmbed,
   buildScheduleLockedNotice
@@ -114,46 +119,60 @@ async function refreshScheduleVoteMessage(client, eventId) {
 
 async function postLockedScheduleBoardEntry(client, eventId) {
   const event = await scheduleService.getScheduleEventById(eventId)
-  const party = await partyService.getPartyById(event.party_id)
+  return syncGuildScheduleBoard(client, event.guild_id, event.board_channel_id)
+}
 
-  if (!event.board_channel_id) {
-    return event
+async function syncGuildScheduleBoard(client, guildId, explicitBoardChannelId = null) {
+  const scheduleConfig = explicitBoardChannelId
+    ? { board_channel_id: explicitBoardChannelId }
+    : await getScheduleConfig(guildId)
+
+  if (!scheduleConfig?.board_channel_id) {
+    return null
   }
 
-  const channel = await fetchTextChannel(client, event.board_channel_id)
+  const channel = await fetchTextChannel(client, scheduleConfig.board_channel_id)
   if (!channel || !channel.isTextBased()) {
-    return event
+    return null
   }
 
-  if (!event.board_message_id) {
+  const entries = await scheduleService.listGuildLockedScheduleEntries(guildId)
+  const embeds = buildScheduleBoardOverviewEmbeds(entries, guildId)
+  const boardState = await getScheduleBoardState(guildId)
+
+  if (!boardState?.board_message_id) {
     const message = await channel.send({
-      content: party.party_role_id ? `<@&${party.party_role_id}>` : `Party ${party.name}`,
-      embeds: [buildScheduleBoardEmbed(event, party)]
+      embeds
     })
 
-    await scheduleService.updateScheduleMessages({
-      eventId,
-      boardChannelId: channel.id,
+    await setScheduleBoardMessage({
+      guildId,
       boardMessageId: message.id
     })
-  } else {
-    const message = await channel.messages.fetch(event.board_message_id).catch(() => null)
-    if (message) {
-      await message.edit({
-        content: party.party_role_id ? `<@&${party.party_role_id}>` : `Party ${party.name}`,
-        embeds: [buildScheduleBoardEmbed(event, party)]
-      })
-    }
+
+    return message
   }
 
-  const sourceChannel = await fetchTextChannel(client, event.source_channel_id)
-  if (sourceChannel?.isTextBased()) {
-    await sourceChannel.send({
-      content: buildScheduleLockedNotice(event)
-    }).catch(() => null)
+  const message = await channel.messages.fetch(boardState.board_message_id).catch(() => null)
+
+  if (!message) {
+    const replacement = await channel.send({
+      embeds
+    })
+
+    await setScheduleBoardMessage({
+      guildId,
+      boardMessageId: replacement.id
+    })
+
+    return replacement
   }
 
-  return scheduleService.getScheduleEventById(eventId)
+  await message.edit({
+    embeds
+  })
+
+  return message
 }
 
 async function announceCancelledSchedule(client, eventId) {
@@ -166,6 +185,8 @@ async function announceCancelledSchedule(client, eventId) {
     }).catch(() => null)
   }
 
+  await syncGuildScheduleBoard(client, event.guild_id)
+
   return event
 }
 
@@ -175,5 +196,6 @@ module.exports = {
   provisionPartyAndAnnounce,
   refreshPartyRecruitmentMessage,
   refreshScheduleVoteMessage,
-  sendPartyConfirmationPrompt
+  sendPartyConfirmationPrompt,
+  syncGuildScheduleBoard
 }
