@@ -126,36 +126,6 @@ async function getPartyMember(executor, partyId, userId) {
   )
 }
 
-async function getConflictingPartyMembership(executor, guildId, userId, excludedPartyId = null) {
-  const args = [guildId, userId]
-  let excludedSql = ""
-
-  if (excludedPartyId) {
-    excludedSql = "AND p.id <> ?"
-    args.push(excludedPartyId)
-  }
-
-  return getOne(
-    executor,
-    `
-      SELECT
-        p.id,
-        p.name,
-        p.status,
-        pm.join_status
-      FROM party_members pm
-      INNER JOIN parties p ON p.id = pm.party_id
-      WHERE p.guild_id = ?
-        AND pm.user_id = ?
-        AND pm.join_status IN ('joined', 'confirmed')
-        AND p.status IN ('recruiting', 'pending_confirm', 'active', 'scheduled')
-        ${excludedSql}
-      LIMIT 1
-    `,
-    args
-  )
-}
-
 async function seedPendingConfirmations(executor, partyId) {
   await run(
     executor,
@@ -479,15 +449,6 @@ async function joinParty({
         "Party is not accepting new members right now.",
         "PARTY_NOT_RECRUITING",
         { partyId, status: party.status }
-      )
-    }
-
-    const conflictingMembership = await getConflictingPartyMembership(tx, party.guild_id, userId, partyId)
-    if (conflictingMembership) {
-      throw new ServiceError(
-        "User is already in another active party in this guild.",
-        "USER_ALREADY_IN_PARTY",
-        { userId, conflictingPartyId: conflictingMembership.id }
       )
     }
 
