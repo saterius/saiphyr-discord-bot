@@ -212,7 +212,7 @@ module.exports = {
 
       const reason = interaction.options.getString("reason") || "Cancelled manually."
       const party = await resolvePartyFromChannel(interaction)
-      const event = await scheduleService.getVotingScheduleEventForParty(party.id)
+      const event = await scheduleService.getCancelableScheduleEventForParty(party.id)
 
       if (!event) {
         throw new ServiceError(

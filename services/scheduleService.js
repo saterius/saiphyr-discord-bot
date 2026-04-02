@@ -350,6 +350,29 @@ async function getVotingScheduleEventForParty(partyId) {
   return loadScheduleEventDetails(db, event.id)
 }
 
+async function getCancelableScheduleEventForParty(partyId) {
+  requireValue(partyId, "partyId is required.")
+
+  const event = await getOne(
+    db,
+    `
+      SELECT id
+      FROM schedule_events
+      WHERE party_id = ?
+        AND status IN (?, ?)
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    `,
+    [partyId, SCHEDULE_STATUS.VOTING, SCHEDULE_STATUS.LOCKED]
+  )
+
+  if (!event) {
+    return null
+  }
+
+  return loadScheduleEventDetails(db, event.id)
+}
+
 async function listPartyScheduleEvents(partyId, { statuses = [] } = {}) {
   requireValue(partyId, "partyId is required.")
 
@@ -801,6 +824,7 @@ module.exports = {
   cancelScheduleEvent,
   completeScheduleEvent,
   createScheduleEvent,
+  getCancelableScheduleEventForParty,
   getScheduleEventById,
   getLatestScheduleEventForParty,
   getVotingScheduleEventForParty,
