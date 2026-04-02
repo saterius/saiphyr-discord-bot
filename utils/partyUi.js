@@ -172,8 +172,9 @@ function formatMember(member) {
 function buildPartyEmbed(party) {
   const activeCount = Number(party.active_member_count || 0)
   const maxMembers = Number(party.max_members || 0)
-  const memberLines = party.members?.length
-    ? party.members.map(formatMember).join("\n")
+  const visibleMembers = (party.members || []).filter((member) => member.join_status !== MEMBER_STATUS.LEFT)
+  const memberLines = visibleMembers.length
+    ? visibleMembers.map(formatMember).join("\n")
     : "ยังไม่มีสมาชิก"
   const statusMeta = partyStatusMeta(party.status)
   const fields = [
@@ -269,9 +270,9 @@ function buildPartyActionRows(party) {
   return [primaryRow, secondaryRow]
 }
 
-function buildClassSelectRow(partyId) {
+function buildClassSelectRow(partyId, customId = `party:class:${partyId}`) {
   const menu = new StringSelectMenuBuilder()
-    .setCustomId(`party:class:${partyId}`)
+    .setCustomId(customId)
     .setPlaceholder("เลือกอาชีพของคุณ")
     .addOptions(
       dragonNestClasses.slice(0, 25).map((job) => ({
@@ -283,16 +284,25 @@ function buildClassSelectRow(partyId) {
   return new ActionRowBuilder().addComponents(menu)
 }
 
-function buildJoinConfirmRows(partyId, classKey) {
+function buildJoinConfirmRows(
+  partyId,
+  classKey,
+  {
+    confirmCustomId = `party:join:confirm:${partyId}:${classKey}`,
+    restartCustomId = `party:join:start:${partyId}`,
+    confirmLabel = "ยืนยันที่จะเข้าร่วม",
+    restartLabel = "เปลี่ยนอาชีพ"
+  } = {}
+) {
   return [
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId(`party:join:confirm:${partyId}:${classKey}`)
-        .setLabel("ยืนยันที่จะเข้าร่วม")
+        .setCustomId(confirmCustomId)
+        .setLabel(confirmLabel)
         .setStyle(ButtonStyle.Success),
       new ButtonBuilder()
-        .setCustomId(`party:join:start:${partyId}`)
-        .setLabel("เปลี่ยนอาชีพ")
+        .setCustomId(restartCustomId)
+        .setLabel(restartLabel)
         .setStyle(ButtonStyle.Secondary)
     )
   ]

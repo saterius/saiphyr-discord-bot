@@ -20,7 +20,8 @@ const {
 } = require("../services/partyMessageService")
 const {
   buildPartyActionRows,
-  buildPartyEmbed
+  buildPartyEmbed,
+  buildClassSelectRow
 } = require("../utils/partyUi")
 
 function formatPartyType(type) {
@@ -345,19 +346,9 @@ module.exports = {
         maxMembers
       })
 
-      const recruitMessage = await interaction.channel.send({
-        embeds: [buildPartyEmbed(party)],
-        components: buildPartyActionRows(party)
-      })
-
-      const updatedParty = await partyService.updatePartyResources({
-        partyId: party.id,
-        recruitChannelId: interaction.channelId,
-        recruitMessageId: recruitMessage.id
-      })
-
       await interaction.editReply({
-        content: `Party created: #${updatedParty.id} (${formatPartyType(updatedParty.party_type)}) in ${interaction.channel}.`
+        content: `สร้างปาร์ตี้ #${party.id} (${formatPartyType(party.party_type)}) แล้ว กรุณาเลือกอาชีพของหัวหน้าปาร์ตี้ก่อนเพื่อโพสต์รับสมาชิก`,
+        components: [buildClassSelectRow(party.id, `party:create_class:${party.id}`)]
       })
 
       return

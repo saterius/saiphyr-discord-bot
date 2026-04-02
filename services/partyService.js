@@ -79,7 +79,7 @@ async function getPartyStats(executor, partyId) {
   )
 
   if (!stats) {
-    throw new ServiceError("Party not found.", "PARTY_NOT_FOUND", { partyId })
+    throw new ServiceError("ไม่พบปาร์ตี้นี้", "PARTY_NOT_FOUND", { partyId })
   }
 
   return stats
@@ -108,7 +108,7 @@ async function getPartyRecord(executor, partyId) {
   )
 
   if (!party) {
-    throw new ServiceError("Party not found.", "PARTY_NOT_FOUND", { partyId })
+    throw new ServiceError("ไม่พบปาร์ตี้นี้", "PARTY_NOT_FOUND", { partyId })
   }
 
   return party
@@ -274,7 +274,7 @@ async function loadPartyDetails(executor, partyId) {
 function ensurePartyOpenForRosterChanges(party) {
   if ([PARTY_STATUS.CLOSED, PARTY_STATUS.CANCELLED].includes(party.status)) {
     throw new ServiceError(
-      "This party is already closed and can no longer be changed.",
+      "ปาร์ตี้นี้ถูกปิดไปแล้ว จึงไม่สามารถแก้ไขได้อีก",
       "PARTY_CLOSED",
       { partyId: party.id, status: party.status }
     )
@@ -296,14 +296,14 @@ async function createParty({
 }) {
   requireValue(guildId, "guildId is required.")
   requireValue(leaderId, "leaderId is required.")
-  requireValue(name, "Party name is required.")
+  requireValue(name, "จำเป็นต้องระบุชื่อปาร์ตี้")
 
   if (!Number.isInteger(maxMembers) || maxMembers <= 0) {
-    throw new ServiceError("maxMembers must be a positive integer.", "VALIDATION_ERROR")
+    throw new ServiceError("จำนวนสมาชิกสูงสุดต้องเป็นตัวเลขจำนวนเต็มที่มากกว่า 0", "VALIDATION_ERROR")
   }
 
   if (!Object.values(PARTY_TYPE).includes(partyType)) {
-    throw new ServiceError("Invalid party type.", "VALIDATION_ERROR", { partyType })
+    throw new ServiceError("ประเภทปาร์ตี้ไม่ถูกต้อง", "VALIDATION_ERROR", { partyType })
   }
 
   return withTransaction("write", async (tx) => {
@@ -472,21 +472,21 @@ async function joinParty({
 
     if (party.status !== PARTY_STATUS.RECRUITING) {
       throw new ServiceError(
-        "Party is not accepting new members right now.",
+        "ปาร์ตี้นี้ยังไม่เปิดรับสมาชิกในตอนนี้",
         "PARTY_NOT_RECRUITING",
         { partyId, status: party.status }
       )
     }
 
     if (party.active_member_count >= party.max_members) {
-      throw new ServiceError("Party is already full.", "PARTY_FULL", { partyId })
+      throw new ServiceError("ปาร์ตี้นี้เต็มแล้ว", "PARTY_FULL", { partyId })
     }
 
     const existingMember = await getPartyMember(tx, partyId, userId)
     const joinedAt = now()
 
     if (existingMember && ACTIVE_MEMBER_STATUSES.includes(existingMember.join_status)) {
-      throw new ServiceError("User is already in this party.", "ALREADY_JOINED", { partyId, userId })
+      throw new ServiceError("คุณอยู่ในปาร์ตี้นี้อยู่แล้ว", "ALREADY_JOINED", { partyId, userId })
     }
 
     if (existingMember) {
@@ -554,7 +554,7 @@ async function respondPartyConfirmation({
   requireValue(response, "response is required.")
 
   if (!Object.values(CONFIRMATION_RESPONSE).includes(response)) {
-    throw new ServiceError("Invalid confirmation response.", "VALIDATION_ERROR", { response })
+    throw new ServiceError("สถานะการยืนยันไม่ถูกต้อง", "VALIDATION_ERROR", { response })
   }
 
   return withTransaction("write", async (tx) => {
@@ -563,7 +563,7 @@ async function respondPartyConfirmation({
 
     if (party.status !== PARTY_STATUS.PENDING_CONFIRM) {
       throw new ServiceError(
-        "Party is not waiting for confirmations.",
+        "ปาร์ตี้นี้ไม่ได้อยู่ในสถานะรอการยืนยัน",
         "PARTY_NOT_PENDING_CONFIRM",
         { partyId, status: party.status }
       )
@@ -572,7 +572,7 @@ async function respondPartyConfirmation({
     const member = await getPartyMember(tx, partyId, userId)
     if (!member || !ACTIVE_MEMBER_STATUSES.includes(member.join_status)) {
       throw new ServiceError(
-        "User is not an active member of this party.",
+        "คุณไม่ได้เป็นสมาชิกของปาร์ตี้นี้",
         "MEMBER_NOT_FOUND",
         { partyId, userId }
       )
@@ -737,7 +737,7 @@ async function kickPartyMember({
 
     if (party.leader_id !== actorId) {
       throw new ServiceError(
-        "Only the party leader can kick members.",
+        "หัวหน้าปาร์ตี้เท่านั้นที่นำสมาชิกออกได้",
         "NOT_PARTY_LEADER",
         { partyId, actorId }
       )
@@ -745,7 +745,7 @@ async function kickPartyMember({
 
     if (targetUserId === party.leader_id) {
       throw new ServiceError(
-        "The party leader cannot kick themselves.",
+        "หัวหน้าปาร์ตี้ไม่สามารถนำตัวเองออกได้",
         "LEADER_CANNOT_BE_KICKED",
         { partyId, actorId }
       )
@@ -754,7 +754,7 @@ async function kickPartyMember({
     const member = await getPartyMember(tx, partyId, targetUserId)
     if (!member || !ACTIVE_MEMBER_STATUSES.includes(member.join_status)) {
       throw new ServiceError(
-        "Target user is not an active member of this party.",
+        "ผู้ใช้ที่เลือกไม่ได้เป็นสมาชิกที่ยังใช้งานอยู่ของปาร์ตี้นี้",
         "MEMBER_NOT_FOUND",
         { partyId, targetUserId }
       )
@@ -819,7 +819,7 @@ async function leaveParty({
     const member = await getPartyMember(tx, partyId, userId)
     if (!member || !ACTIVE_MEMBER_STATUSES.includes(member.join_status)) {
       throw new ServiceError(
-        "User is not an active member of this party.",
+        "คุณไม่ได้เป็นสมาชิกของปาร์ตี้นี้",
         "MEMBER_NOT_FOUND",
         { partyId, userId }
       )
@@ -827,7 +827,7 @@ async function leaveParty({
 
     if (party.leader_id === userId) {
       throw new ServiceError(
-        "Leader transfer is not implemented yet, so the leader cannot leave directly.",
+        "ตอนนี้ยังไม่มีระบบโอนหัวหน้าปาร์ตี้ ดังนั้นหัวหน้าปาร์ตี้ยังออกจากปาร์ตี้เองตรง ๆ ไม่ได้",
         "LEADER_CANNOT_LEAVE",
         { partyId, userId }
       )
@@ -917,7 +917,7 @@ async function updatePartyStatus({
   requireValue(status, "status is required.")
 
   if (!Object.values(PARTY_STATUS).includes(status)) {
-    throw new ServiceError("Invalid party status.", "VALIDATION_ERROR", { status })
+    throw new ServiceError("สถานะปาร์ตี้ไม่ถูกต้อง", "VALIDATION_ERROR", { status })
   }
 
   return withTransaction("write", async (tx) => {
@@ -925,7 +925,7 @@ async function updatePartyStatus({
 
     if (party.leader_id !== actorId) {
       throw new ServiceError(
-        "Only the party leader can update the party status.",
+        "หัวหน้าปาร์ตี้เท่านั้นที่เปลี่ยนสถานะปาร์ตี้ได้",
         "NOT_PARTY_LEADER",
         { partyId, actorId }
       )
