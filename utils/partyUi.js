@@ -534,6 +534,14 @@ function buildPartyActivationNotice(party) {
   return `${roleMention} พร้อมแล้ว. ช่องของปาร์ตี้คุณคือ ${channelMention}.`
 }
 
+function buildPartyPlannedTimeNotice(party) {
+  if (party.party_type !== PARTY_TYPE.AD_HOC || !party.planned_start_at_unix) {
+    return null
+  }
+
+  return `เวลานัดลง: ${renderPartyPlannedTime(party)}`
+}
+
 function buildScheduleLockedNotice(event) {
   const boardMention = event.board_channel_id ? `<#${event.board_channel_id}>` : "the schedule board"
   return `ตารางนัดเวลาได้รับการล็อกแล้วที่ ${event.proposed_start_at}. ตารางนี้ถูกโพสต์ไปที่ ${boardMention}.`
@@ -560,6 +568,7 @@ module.exports = {
   buildPartyConfirmationNotice,
   buildPartyEmbed,
   buildPartyFinishSuggestionRows,
+  buildPartyPlannedTimeNotice,
   buildScheduleActionRows,
   buildScheduleBoardOverviewEmbeds,
   buildScheduleCancelledNotice,
