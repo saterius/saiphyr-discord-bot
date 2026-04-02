@@ -13,6 +13,7 @@ const {
   buildPartyConfirmationNotice,
   buildPartyEmbed,
   buildPartyFinishSuggestionRows,
+  buildPartyPlannedTimeNotice,
   buildScheduleActionRows,
   buildScheduleBoardOverviewEmbeds,
   buildScheduleCancelledNotice,
@@ -94,10 +95,17 @@ async function provisionPartyAndAnnounce(client, partyId) {
     parentId: recruitChannel?.parentId || null
   })
 
-  if (recruitChannel?.isTextBased()) {
-    await recruitChannel.send({
+  if (provisioned.channel?.isTextBased()) {
+    await provisioned.channel.send({
       content: buildPartyActivationNotice(provisioned.party)
     }).catch(() => null)
+
+    const plannedTimeNotice = buildPartyPlannedTimeNotice(provisioned.party)
+    if (plannedTimeNotice) {
+      await provisioned.channel.send({
+        content: plannedTimeNotice
+      }).catch(() => null)
+    }
   }
 
   return provisioned.party
