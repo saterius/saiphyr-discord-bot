@@ -424,7 +424,8 @@ function buildScheduleBoardOverviewEmbeds(entries, guildId) {
 }
 
 function buildScheduleActionRows(event) {
-  const disabled = event.status !== SCHEDULE_STATUS.VOTING
+  const voteDisabled = event.status !== SCHEDULE_STATUS.VOTING
+  const cancelDisabled = [SCHEDULE_STATUS.CANCELLED, SCHEDULE_STATUS.EXPIRED].includes(event.status)
 
   return [
     new ActionRowBuilder().addComponents(
@@ -432,12 +433,17 @@ function buildScheduleActionRows(event) {
         .setCustomId(`schedule:vote:${event.id}:${SCHEDULE_VOTE.ACCEPT}`)
         .setLabel("ยอมรับ")
         .setStyle(ButtonStyle.Success)
-        .setDisabled(disabled),
+        .setDisabled(voteDisabled),
       new ButtonBuilder()
         .setCustomId(`schedule:vote:${event.id}:${SCHEDULE_VOTE.DENY}`)
         .setLabel("ปฏิเสธ")
         .setStyle(ButtonStyle.Danger)
-        .setDisabled(disabled)
+        .setDisabled(voteDisabled),
+      new ButtonBuilder()
+        .setCustomId(`schedule:cancel:${event.id}`)
+        .setLabel("ยกเลิกตาราง")
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(cancelDisabled)
     )
   ]
 }
