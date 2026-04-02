@@ -231,7 +231,7 @@ function buildPartyActionRows(party) {
   const closeRecruitmentDisabled = party.status !== PARTY_STATUS.RECRUITING
   const cancelDisabled = [PARTY_STATUS.CLOSED, PARTY_STATUS.CANCELLED].includes(party.status)
 
-  const actionRow = new ActionRowBuilder().addComponents(
+  const primaryRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`party:join:start:${party.id}`)
       .setLabel("เข้าร่วมปาร์ตี้")
@@ -250,7 +250,10 @@ function buildPartyActionRows(party) {
     new ButtonBuilder()
       .setCustomId(`party:refresh:${party.id}`)
       .setLabel("รีเฟรช")
-      .setStyle(ButtonStyle.Secondary),
+      .setStyle(ButtonStyle.Secondary)
+  )
+
+  const secondaryRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`party:close_recruitment:${party.id}`)
       .setLabel("ปิดรับสมัคร")
@@ -263,7 +266,7 @@ function buildPartyActionRows(party) {
       .setDisabled(cancelDisabled)
   )
 
-  return [actionRow]
+  return [primaryRow, secondaryRow]
 }
 
 function buildClassSelectRow(partyId) {
