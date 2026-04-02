@@ -1,5 +1,7 @@
 const scheduleService = require("./scheduleService")
 const {
+  announceCancelledSchedule,
+  refreshScheduleVoteMessage,
   sendScheduleCompletionSuggestion,
   syncGuildScheduleBoard
 } = require("./partyMessageService")
@@ -16,6 +18,18 @@ async function processScheduleCompletionPrompts(client) {
   reminderRunning = true
 
   try {
+    const overdueVotingEvents = await scheduleService.listVotingScheduleEventsPastDue()
+
+    for (const event of overdueVotingEvents) {
+      await scheduleService.autoCancelScheduleEvent({
+        eventId: event.id,
+        reason: "ยกเลิกอัตโนมัติ เพราะสมาชิกยอมรับไม่ครบก่อนถึงเวลานัด"
+      })
+
+      await refreshScheduleVoteMessage(client, event.id).catch(() => null)
+      await announceCancelledSchedule(client, event.id).catch(() => null)
+    }
+
     const events = await scheduleService.listScheduleEventsNeedingCompletionPrompt()
 
     for (const event of events) {
