@@ -446,6 +446,37 @@ async function handleScheduleButton(interaction) {
     return true
   }
 
+  if (action === "cancel") {
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+
+    const event = await scheduleService.getScheduleEventById(eventId)
+
+    if (event.leader_id !== interaction.user.id) {
+      throw new ServiceError(
+        "หัวหน้าปาร์ตี้เท่านั้นที่ยกเลิกตารางนัดเวลาได้",
+        "NOT_PARTY_LEADER",
+        { eventId, actorId: interaction.user.id }
+      )
+    }
+
+    await scheduleService.cancelScheduleEvent({
+      eventId,
+      actorId: interaction.user.id,
+      reason: "ยกเลิกจากปุ่มบนโพสต์ตารางนัด"
+    })
+
+    await refreshScheduleVoteMessage(interaction.client, eventId)
+    await syncGuildScheduleBoard(interaction.client, event.guild_id)
+
+    await interaction.editReply({
+      content: `ยกเลิกตารางนัดเวลา #${eventId} เรียบร้อยแล้ว`
+    })
+
+    return true
+  }
+
   if (action !== "vote") {
     return false
   }
