@@ -122,6 +122,30 @@ async function handlePartyButton(interaction) {
     return true
   }
 
+  if (action === "leave") {
+    const partyId = Number(parts[0])
+
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+
+    const result = await partyService.leaveParty({
+      partyId,
+      userId: interaction.user.id,
+      reason: "left_via_button"
+    })
+
+    await refreshPartyRecruitmentMessage(interaction.client, partyId)
+
+    await interaction.editReply({
+      content: result.reopenedRecruitment
+        ? `คุณออกจากปาร์ตี้ #${partyId} แล้ว และระบบกลับมาเปิดรับสมาชิกอีกครั้ง`
+        : `คุณออกจากปาร์ตี้ #${partyId} เรียบร้อยแล้ว`
+    })
+
+    return true
+  }
+
   if (action === "refresh") {
     const partyId = Number(parts[0])
 
