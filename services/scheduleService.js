@@ -561,12 +561,11 @@ async function cancelScheduleEvent({
 
   return withTransaction("write", async (tx) => {
     const event = await getScheduleEventRecord(tx, eventId)
-    const party = await getPartyForScheduling(tx, event.party_id)
 
-    if (party.leader_id !== actorId) {
+    if (event.creator_id !== actorId) {
       throw new ServiceError(
-        "Only the party leader can cancel a schedule event.",
-        "NOT_PARTY_LEADER",
+        "เฉพาะคนที่สร้างตารางนัดนี้เท่านั้นที่ยกเลิกได้",
+        "NOT_SCHEDULE_CREATOR",
         { eventId, actorId }
       )
     }

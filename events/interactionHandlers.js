@@ -1,4 +1,4 @@
-const { MessageFlags } = require("discord.js")
+﻿const { MessageFlags } = require("discord.js")
 
 const partyService = require("../services/partyService")
 const scheduleService = require("../services/scheduleService")
@@ -27,7 +27,7 @@ function createErrorReply(error) {
     return error.message
   }
 
-  return "มีบางอย่างผิดพลาดสำหรับการกระทำนี้."
+  return "เกิดข้อผิดพลาดระหว่างการทำงาน กรุณาลองใหม่อีกครั้ง"
 }
 
 async function replyWithError(interaction, error) {
@@ -45,6 +45,102 @@ async function replyWithError(interaction, error) {
     content,
     flags: MessageFlags.Ephemeral
   }).catch(() => null)
+}
+
+function createButtonLockError(interaction) {
+  return new ServiceError(
+    "ปุ่มนี้กำลังอยู่ระหว่างการประมวลผล กรุณารอสักครู่",
+    "BUTTON_ACTION_IN_PROGRESS",
+    { customId: interaction.customId, userId: interaction.user?.id || null }
+  )
+}
+
+function getButtonLockKey(interaction) {
+  if (!interaction?.customId || !interaction?.user?.id) {
+    return null
+  }
+
+  const [scope, action, ...parts] = interaction.customId.split(":")
+
+  if (scope === "party") {
+    if (action === "join" && parts[0] === "start") {
+      return `party:join:start:${parts[1]}:${interaction.user.id}`
+    }
+
+    if (action === "join" && parts[0] === "confirm") {
+      return `party:join:confirm:${parts[1]}:${interaction.user.id}`
+    }
+
+    if (action === "confirm") {
+      return `party:confirm:${parts[0]}:${interaction.user.id}`
+    }
+
+    if (action === "leave") {
+      return `party:leave:${parts[0]}:${interaction.user.id}`
+    }
+
+    if (action === "refresh") {
+      return `party:refresh:${parts[0]}:${interaction.user.id}`
+    }
+
+    if (action === "close_recruitment") {
+      return `party:close_recruitment:${parts[0]}`
+    }
+
+    if (action === "cancel") {
+      return `party:cancel:${parts[0]}:${interaction.user.id}`
+    }
+
+    if (action === "cancel_confirm") {
+      return `party:cancel_confirm:${parts[0]}`
+    }
+
+    if (action === "cancel_abort") {
+      return `party:cancel_abort:${parts[0]}`
+    }
+
+    if (action === "finish_now") {
+      return `party:finish_now:${parts[0]}`
+    }
+
+    if (action === "finish_abort") {
+      return `party:finish_abort:${parts[0]}`
+    }
+  }
+
+  if (scope === "schedule" && action === "vote") {
+    return `schedule:vote:${parts[0]}:${interaction.user.id}`
+  }
+
+  if (scope === "schedule" && action === "cancel") {
+    return `schedule:cancel:${parts[0]}:${interaction.user.id}`
+  }
+
+  if (scope === "schedule" && action === "complete") {
+    return `schedule:complete:${parts[0]}`
+  }
+
+  return null
+}
+
+async function withButtonLock(interaction, handler) {
+  const lockKey = getButtonLockKey(interaction)
+
+  if (!lockKey) {
+    return handler()
+  }
+
+  if (activeButtonLocks.has(lockKey)) {
+    throw createButtonLockError(interaction)
+  }
+
+  activeButtonLocks.add(lockKey)
+
+  try {
+    return await handler()
+  } finally {
+    activeButtonLocks.delete(lockKey)
+  }
 }
 
 async function handlePartyButton(interaction) {
@@ -119,7 +215,7 @@ async function handlePartyButton(interaction) {
     const party = await partyService.getPartyById(partyId)
 
     await interaction.editReply({
-      content: `เลือกอาชีพสำหรับปาร์ตี้ #${partyId} (${party.name}).`,
+      content: `เลือกอาชีพสำหรับปาร์ตี้ #${partyId} (${party.name})`,
       components: [buildClassSelectRow(partyId)]
     })
 
@@ -147,7 +243,7 @@ async function handlePartyButton(interaction) {
     }
 
     await interaction.editReply({
-      content: `คุณได้เข้าร่วมปาร์ตี้ #${partyId} ด้วยอาชีพ ${classOption?.label || classKey}.`,
+      content: `คุณได้เข้าร่วมปาร์ตี้ #${partyId} ด้วยอาชีพ ${classOption?.label || classKey}`,
       components: []
     })
 
@@ -171,13 +267,13 @@ async function handlePartyButton(interaction) {
 
     if (result.partyActivated) {
       await provisionPartyAndAnnounce(interaction.client, partyId)
-      activeNotice = " ปาร์ตี้พร้อมแล้ว."
+      activeNotice = " ปาร์ตี้พร้อมแล้ว"
     }
 
     await refreshPartyRecruitmentMessage(interaction.client, partyId)
 
     await interaction.editReply({
-      content: `การยืนยันสำหรับปาร์ตี้ #${partyId}${activeNotice} ถูกบันทึกแล้ว`
+      content: `บันทึกการยืนยันสำหรับปาร์ตี้ #${partyId} เรียบร้อยแล้ว${activeNotice}`
     })
 
     return true
@@ -217,7 +313,7 @@ async function handlePartyButton(interaction) {
     await refreshPartyRecruitmentMessage(interaction.client, partyId)
 
     await interaction.editReply({
-      content: `ปาร์ตี้ #${partyId} ถูกรีเฟรช.`
+      content: `รีเฟรชปาร์ตี้ #${partyId} เรียบร้อยแล้ว`
     })
 
     return true
@@ -256,14 +352,14 @@ async function handlePartyButton(interaction) {
 
     if (party.leader_id !== interaction.user.id) {
       throw new ServiceError(
-        "หัวหน้าปาร์ตี้เท่านั้นที่ยกเลิกปาร์ตี้ได้.",
+        "หัวหน้าปาร์ตี้เท่านั้นที่ยกเลิกปาร์ตี้ได้",
         "NOT_PARTY_LEADER",
         { partyId, actorId: interaction.user.id }
       )
     }
 
     await interaction.editReply({
-      content: `ยกเลิกปาร์ตี้ #${partyId} (${party.name})? การกระทำนี้จะปิดรับการสมัครสมาชิก.`,
+      content: `ยกเลิกปาร์ตี้ #${partyId} (${party.name})? การกระทำนี้จะปิดรับสมาชิกของปาร์ตี้นี้`,
       components: buildPartyCancelConfirmRows(partyId)
     })
 
@@ -285,7 +381,7 @@ async function handlePartyButton(interaction) {
     await refreshPartyRecruitmentMessage(interaction.client, partyId)
 
     await interaction.editReply({
-      content: `ปาร์ตี้ #${partyId} ถูกยกเลิกแล้ว.`,
+      content: `ปาร์ตี้ #${partyId} ถูกยกเลิกแล้ว`,
       components: []
     })
 
@@ -296,7 +392,7 @@ async function handlePartyButton(interaction) {
     const partyId = Number(parts[0])
 
     await interaction.update({
-      content: `ปาร์ตี้ #${partyId} ยังไม่ได้ถูกยกเลิก.`,
+      content: `ปาร์ตี้ #${partyId} ยังไม่ได้ถูกยกเลิก`,
       components: []
     })
 
@@ -312,7 +408,7 @@ async function handlePartyButton(interaction) {
 
     if (party.leader_id !== interaction.user.id) {
       throw new ServiceError(
-        "หัวหน้าปาร์ตี้เท่านั้นที่จบปาร์ตี้ได้.",
+        "หัวหน้าปาร์ตี้เท่านั้นที่จบปาร์ตี้ได้",
         "NOT_PARTY_LEADER",
         { partyId, actorId: interaction.user.id }
       )
@@ -360,7 +456,7 @@ async function handlePartyButton(interaction) {
 
     if (party.leader_id !== interaction.user.id) {
       throw new ServiceError(
-        "หัวหน้าปาร์ตี้เท่านั้นที่จัดการข้อความนี้ได้.",
+        "หัวหน้าปาร์ตี้เท่านั้นที่จัดการข้อความนี้ได้",
         "NOT_PARTY_LEADER",
         { partyId, actorId: interaction.user.id }
       )
@@ -386,7 +482,7 @@ async function handlePartyClassSelect(interaction) {
     const classOption = getClassOption(classKey)
 
     await interaction.update({
-      content: `อาชีพหัวหน้าปาร์ตี้ที่เลือก: ${classOption?.label || classKey}. กดยืนยันเพื่อโพสต์รับสมาชิกสำหรับปาร์ตี้ #${partyId}`,
+      content: `อาชีพหัวหน้าปาร์ตี้ที่เลือก: ${classOption?.label || classKey} กดยืนยันเพื่อโพสต์รับสมาชิกสำหรับปาร์ตี้ #${partyId}`,
       components: buildJoinConfirmRows(partyId, classKey, {
         confirmCustomId: `party:create_confirm:${partyId}:${classKey}`,
         restartCustomId: `party:create_restart:${partyId}`,
@@ -407,7 +503,7 @@ async function handlePartyClassSelect(interaction) {
   const classOption = getClassOption(classKey)
 
   await interaction.update({
-    content: `อาชีพที่เลือก: ${classOption?.label || classKey}. กรุณากดปุ่ม "ยืนยันที่จะเข้าร่วม" เพื่อเข้าร่วมปาร์ตี้ #${partyId}.`,
+    content: `อาชีพที่เลือก: ${classOption?.label || classKey} กรุณากดปุ่ม "ยืนยันที่จะเข้าร่วม" เพื่อเข้าร่วมปาร์ตี้ #${partyId}`,
     components: buildJoinConfirmRows(partyId, classKey)
   })
 
@@ -416,7 +512,6 @@ async function handlePartyClassSelect(interaction) {
 
 async function handleScheduleButton(interaction) {
   const [, action, eventIdValue, vote] = interaction.customId.split(":")
-
   const eventId = Number(eventIdValue)
 
   if (action === "complete") {
@@ -464,10 +559,10 @@ async function handleScheduleButton(interaction) {
 
     const event = await scheduleService.getScheduleEventById(eventId)
 
-    if (event.leader_id !== interaction.user.id) {
+    if (event.creator_id !== interaction.user.id) {
       throw new ServiceError(
-        "หัวหน้าปาร์ตี้เท่านั้นที่ยกเลิกตารางนัดเวลาได้",
-        "NOT_PARTY_LEADER",
+        "เฉพาะคนที่สร้างตารางนัดนี้เท่านั้นที่ยกเลิกได้",
+        "NOT_SCHEDULE_CREATOR",
         { eventId, actorId: interaction.user.id }
       )
     }
@@ -511,7 +606,7 @@ async function handleScheduleButton(interaction) {
   }
 
   await interaction.editReply({
-    content: `การโหวตตารางนัดเวลา #${eventId} ถูกบันทึกว่า ${vote}.`
+    content: `บันทึกการโหวตตารางนัดเวลา #${eventId} เป็น ${vote} เรียบร้อยแล้ว`
   })
 
   return true
