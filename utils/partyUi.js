@@ -8,6 +8,8 @@
 
 const dragonNestClasses = require("../data/dragonNestClasses")
 const {
+  CONFIRMATION_RESPONSE,
+  MEMBER_STATUS,
   PARTY_STATUS,
   PARTY_TYPE,
   SCHEDULE_STATUS,
@@ -137,13 +139,34 @@ function partyTypeLabel(type) {
   return labels[type] || type || "-"
 }
 
+function memberStatusLabel(status) {
+  const labels = {
+    [MEMBER_STATUS.JOINED]: "เข้าร่วมแล้ว",
+    [MEMBER_STATUS.CONFIRMED]: "ยืนยันแล้ว",
+    [MEMBER_STATUS.KICKED]: "ถูกนำออก",
+    [MEMBER_STATUS.LEFT]: "ออกจากปาร์ตี้"
+  }
+
+  return labels[status] || status || "-"
+}
+
+function confirmationResponseLabel(response) {
+  const labels = {
+    [CONFIRMATION_RESPONSE.PENDING]: "รอการยืนยัน",
+    [CONFIRMATION_RESPONSE.ACCEPTED]: "ยืนยันแล้ว",
+    [CONFIRMATION_RESPONSE.DECLINED]: "ปฏิเสธ"
+  }
+
+  return labels[response] || response || "-"
+}
+
 function formatMember(member) {
   const job = member.class_label || getClassOption(member.class_key)?.label || member.class_key
   const confirm = member.confirmation_response
-    ? ` | ยืนยัน: ${member.confirmation_response}`
-    : ""
+    ? ` | ยืนยัน: ${confirmationResponseLabel(member.confirmation_response)}`
+      : ""
 
-  return `- <@${member.user_id}> | ${job} | ${member.join_status}${confirm}`
+  return `- <@${member.user_id}> | ${job} | ${memberStatusLabel(member.join_status)}${confirm}`
 }
 
 function buildPartyEmbed(party) {
@@ -204,6 +227,7 @@ function buildPartyActionRows(party) {
     .includes(party.status)
   const joinDisabled = isClosed || party.status !== PARTY_STATUS.RECRUITING
   const confirmDisabled = party.status !== PARTY_STATUS.PENDING_CONFIRM
+  const leaveDisabled = [PARTY_STATUS.CLOSED, PARTY_STATUS.CANCELLED].includes(party.status)
   const closeRecruitmentDisabled = party.status !== PARTY_STATUS.RECRUITING
   const cancelDisabled = [PARTY_STATUS.CLOSED, PARTY_STATUS.CANCELLED].includes(party.status)
 
@@ -218,6 +242,11 @@ function buildPartyActionRows(party) {
       .setLabel("ยืนยันปาร์ตี้")
       .setStyle(ButtonStyle.Success)
       .setDisabled(confirmDisabled),
+    new ButtonBuilder()
+      .setCustomId(`party:leave:${party.id}`)
+      .setLabel("ออกจากปาร์ตี้")
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(leaveDisabled),
     new ButtonBuilder()
       .setCustomId(`party:refresh:${party.id}`)
       .setLabel("รีเฟรช")
@@ -309,6 +338,13 @@ function buildScheduleEmbed(event, party) {
     .map((vote) => `<@${vote.user_id}>`)
     .join(", ") || "-"
 
+  const votedUserIds = new Set(event.votes.map((vote) => vote.user_id))
+  const pendingMentions = (party?.members || [])
+    .filter((member) => ["joined", "confirmed"].includes(member.join_status))
+    .filter((member) => !votedUserIds.has(member.user_id))
+    .map((member) => `<@${member.user_id}>`)
+    .join(", ") || "-"
+
   return new EmbedBuilder()
     .setTitle("Schedule Vote")
     .setDescription(event.description || `โหวตตารางนัดเวลาสำหรับปาร์ตี้ ${party.name}`)
@@ -343,6 +379,11 @@ function buildScheduleEmbed(event, party) {
       {
         name: "ปฏิเสธ",
         value: truncate(deniedMentions),
+        inline: false
+      },
+      {
+        name: "รอการโหวต",
+        value: truncate(pendingMentions),
         inline: false
       }
     )
