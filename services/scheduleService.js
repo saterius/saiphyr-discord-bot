@@ -753,6 +753,83 @@ async function listScheduleEventsNeedingCompletionPrompt({
   )
 }
 
+async function listVotingScheduleEventsPastDue({
+  nowUnix = Math.floor(Date.now() / 1000)
+} = {}) {
+  return getMany(
+    db,
+    `
+      SELECT
+        se.id,
+        se.party_id,
+        se.title,
+        se.description,
+        se.proposed_start_at,
+        se.status,
+        se.timezone,
+        se.source_channel_id,
+        se.vote_message_id,
+        se.board_channel_id,
+        se.board_message_id,
+        setm.start_at_unix,
+        setm.end_at_unix,
+        p.guild_id,
+        p.name AS party_name,
+        p.leader_id,
+        p.party_role_id,
+        p.party_channel_id,
+        p.party_type
+      FROM schedule_events se
+      INNER JOIN parties p ON p.id = se.party_id
+      INNER JOIN schedule_event_times setm ON setm.event_id = se.id
+      WHERE se.status = ?
+        AND setm.start_at_unix IS NOT NULL
+        AND setm.start_at_unix <= ?
+      ORDER BY setm.start_at_unix ASC, se.id ASC
+    `,
+    [SCHEDULE_STATUS.VOTING, nowUnix]
+  )
+}
+
+async function autoCancelScheduleEvent({
+  eventId,
+  reason = "Schedule expired before every member accepted."
+}) {
+  requireValue(eventId, "eventId is required.")
+
+  return withTransaction("write", async (tx) => {
+    const event = await getScheduleEventRecord(tx, eventId)
+
+    if (event.status !== SCHEDULE_STATUS.VOTING) {
+      return loadScheduleEventDetails(tx, eventId)
+    }
+
+    const cancelledAt = now()
+
+    await run(
+      tx,
+      `
+        UPDATE schedule_events
+        SET status = ?,
+            cancelled_at = ?,
+            cancelled_reason = ?
+        WHERE id = ?
+      `,
+      [SCHEDULE_STATUS.CANCELLED, cancelledAt, reason, eventId]
+    )
+
+    await insertScheduleLog(tx, {
+      partyId: event.party_id,
+      actorId: "system",
+      action: "schedule_auto_cancelled",
+      scheduleEventId: eventId,
+      meta: { reason, cancelledAt }
+    })
+
+    return loadScheduleEventDetails(tx, eventId)
+  })
+}
+
 async function markScheduleCompletionPromptSent({
   eventId,
   promptChannelId = null,
@@ -830,8 +907,10 @@ module.exports = {
   getVotingScheduleEventForParty,
   listGuildLockedScheduleEntries,
   listScheduleEventsNeedingCompletionPrompt,
+  listVotingScheduleEventsPastDue,
   listPartyScheduleEvents,
   markScheduleCompletionPromptSent,
+  autoCancelScheduleEvent,
   updateScheduleMessages,
   voteOnSchedule
 }
