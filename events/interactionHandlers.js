@@ -18,6 +18,8 @@ const {
   buildPartyCancelConfirmRows,
   buildPartyFinishSuggestionRows,
   buildJoinConfirmRows,
+  buildPartyActionRows,
+  buildPartyEmbed,
   getClassOption
 } = require("../utils/partyUi")
 
@@ -134,6 +136,65 @@ async function withButtonLock(interaction, handler) {
 
 async function handlePartyButton(interaction) {
   const [, action, ...parts] = interaction.customId.split(":")
+
+  if (action === "create_restart") {
+    const partyId = Number(parts[0])
+
+    await interaction.update({
+      content: `เลือกอาชีพของหัวหน้าปาร์ตี้สำหรับปาร์ตี้ #${partyId}`,
+      components: [buildClassSelectRow(partyId, `party:create_class:${partyId}`)]
+    })
+
+    return true
+  }
+
+  if (action === "create_confirm") {
+    const partyId = Number(parts[0])
+    const classKey = parts[1]
+    const classOption = getClassOption(classKey)
+
+    await interaction.deferUpdate()
+
+    const currentParty = await partyService.getPartyById(partyId)
+
+    if (currentParty.recruit_message_id) {
+      await interaction.editReply({
+        content: `ปาร์ตี้ #${partyId} ถูกโพสต์รับสมาชิกไปแล้ว`,
+        components: []
+      })
+
+      return true
+    }
+
+    await partyService.joinParty({
+      partyId,
+      userId: interaction.user.id,
+      classKey,
+      classLabel: classOption?.label || classKey
+    })
+
+    const party = await partyService.getPartyById(partyId)
+
+    const recruitMessage = await interaction.channel.send({
+      embeds: [buildPartyEmbed(party)],
+      components: buildPartyActionRows(party)
+    })
+
+    const updatedParty = await partyService.updatePartyResources({
+      partyId,
+      recruitChannelId: interaction.channelId,
+      recruitMessageId: recruitMessage.id
+    })
+
+    await refreshPartyRecruitmentMessage(interaction.client, partyId)
+
+    await interaction.editReply({
+      content: `โพสต์รับสมาชิกของปาร์ตี้ #${updatedParty.id} เรียบร้อยแล้ว และตั้งอาชีพหัวหน้าปาร์ตี้เป็น ${classOption?.label || classKey}`,
+      components: []
+    })
+
+    return true
+  }
 
   if (action === "join" && parts[0] === "start") {
     const partyId = Number(parts[1])
@@ -410,6 +471,24 @@ async function handlePartyButton(interaction) {
 
 async function handlePartyClassSelect(interaction) {
   const [, action, partyIdValue] = interaction.customId.split(":")
+
+  if (action === "create_class") {
+    const partyId = Number(partyIdValue)
+    const classKey = interaction.values[0]
+    const classOption = getClassOption(classKey)
+
+    await interaction.update({
+      content: `อาชีพหัวหน้าปาร์ตี้ที่เลือก: ${classOption?.label || classKey}. กดยืนยันเพื่อโพสต์รับสมาชิกสำหรับปาร์ตี้ #${partyId}`,
+      components: buildJoinConfirmRows(partyId, classKey, {
+        confirmCustomId: `party:create_confirm:${partyId}:${classKey}`,
+        restartCustomId: `party:create_restart:${partyId}`,
+        confirmLabel: "ยืนยันและโพสต์รับสมาชิก",
+        restartLabel: "เปลี่ยนอาชีพ"
+      })
+    })
+
+    return true
+  }
 
   if (action !== "class") {
     return false
