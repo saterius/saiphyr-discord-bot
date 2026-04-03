@@ -724,7 +724,7 @@ module.exports = {
         `รายการเงิน: ${amounts.join(" + ")} = ${formatGold(grossTotal)}`,
         `ค่าสแตมป์: ${stampCount} x 2 = ${formatGold(stampCost)}`,
         `เงินหลังหักค่าสแตมป์: ${formatGold(netTotal)}`,
-        `หาร ${memberCount} คน = ${formatGold(perMember)} / คน`,
+        `หาร ${memberCount} คน = \`${formatGold(perMember)}\` / คน`,
         stampCount > 0
           ? `คนที่ออกสแตมป์จะดึงเพิ่มได้ ${formatGold(stampBonus)}`
           : "ไม่มีค่าสแตมป์ที่ต้องชดเชยเพิ่ม",
