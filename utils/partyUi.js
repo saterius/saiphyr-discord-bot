@@ -401,7 +401,7 @@ function buildScheduleEmbed(event, party) {
       }
     )
     .setFooter({
-      text: `ตารางเวลา #${event.id} | ไทม์โซน: ${event.timezone || "Asia/Bangkok"}`
+      text: `ตารางเวลา #${event.id}`
     })
 }
 
