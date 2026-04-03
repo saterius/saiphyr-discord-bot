@@ -236,6 +236,46 @@ module.exports = {
             .setMinValue(2)
             .setMaxValue(8)
         )
+        .addUserOption((option) =>
+          option
+            .setName("member_1")
+            .setDescription("สมาชิกคนที่ 1")
+        )
+        .addUserOption((option) =>
+          option
+            .setName("member_2")
+            .setDescription("สมาชิกคนที่ 2")
+        )
+        .addUserOption((option) =>
+          option
+            .setName("member_3")
+            .setDescription("สมาชิกคนที่ 3")
+        )
+        .addUserOption((option) =>
+          option
+            .setName("member_4")
+            .setDescription("สมาชิกคนที่ 4")
+        )
+        .addUserOption((option) =>
+          option
+            .setName("member_5")
+            .setDescription("สมาชิกคนที่ 5")
+        )
+        .addUserOption((option) =>
+          option
+            .setName("member_6")
+            .setDescription("สมาชิกคนที่ 6")
+        )
+        .addUserOption((option) =>
+          option
+            .setName("member_7")
+            .setDescription("สมาชิกคนที่ 7")
+        )
+        .addUserOption((option) =>
+          option
+            .setName("member_8")
+            .setDescription("สมาชิกคนที่ 8")
+        )
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -462,6 +502,16 @@ module.exports = {
       const hour = interaction.options.getInteger("hour")
       const minute = interaction.options.getInteger("minute")
       const maxMembers = interaction.options.getInteger("max_members") || 8
+      const selectedMembers = [
+        interaction.options.getUser("member_1"),
+        interaction.options.getUser("member_2"),
+        interaction.options.getUser("member_3"),
+        interaction.options.getUser("member_4"),
+        interaction.options.getUser("member_5"),
+        interaction.options.getUser("member_6"),
+        interaction.options.getUser("member_7"),
+        interaction.options.getUser("member_8")
+      ].filter(Boolean)
 
       const hasFullPlannedTime = [year, month, day, hour, minute].every((value) => value !== null)
       const hasAnyPlannedTime = [year, month, day, hour, minute].some((value) => value !== null)
@@ -485,10 +535,8 @@ module.exports = {
         : null
 
       await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+      const manualMemberIds = selectedMembers.map((member) => member.id)
 
-      await interaction.guild.members.fetch().catch(() => null)
-
-      const roleMemberIds = [...role.members.keys()]
       const importedParty = await partyService.importParty({
         guildId: interaction.guildId,
         leaderId: leader.id,
@@ -500,7 +548,7 @@ module.exports = {
         plannedTimezone: plannedStartAtUnix ? "Asia/Bangkok" : null,
         partyRoleId: role.id,
         partyChannelId: channel.id,
-        memberIds: roleMemberIds,
+        memberIds: manualMemberIds,
         maxMembers
       })
 
