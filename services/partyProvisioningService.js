@@ -108,7 +108,7 @@ async function provisionPartyResources(guild, partyId, options = {}) {
   }
 
   const partyChannelConfig = await getPartyChannelConfig(guild.id)
-  const resolvedParentId = options.parentId || partyChannelConfig?.category_channel_id || null
+  const resolvedParentId = partyChannelConfig?.category_channel_id || options.parentId || null
   const role = await resolveRole(guild, party, options.roleName)
   const channel = await resolveTextChannel(guild, party, role, {
     ...options,
