@@ -4,6 +4,7 @@
   "description": "SaiphyR Discord Bot",
   "main": "index.js",
   "scripts": {
+    "prestart": "node utils/deployCommands.js",
     "start": "node index.js",
     "deploy": "node utils/deployCommands.js",
     "db:init": "node db/init.js"
