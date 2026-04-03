@@ -484,6 +484,8 @@ module.exports = {
         ? buildBangkokUnixTimestamp(year, month, day, hour, minute)
         : null
 
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+
       await interaction.guild.members.fetch().catch(() => null)
 
       const roleMemberIds = [...role.members.keys()]
@@ -502,9 +504,8 @@ module.exports = {
         maxMembers
       })
 
-      await interaction.reply({
-        content: `นำเข้าปาร์ตี้ #${importedParty.id} เรียบร้อยแล้ว สมาชิกจากยศ ${role} ถูกผูกเข้าระบบแล้ว${importedParty.members.length ? ` (${importedParty.members.length} คน)` : ""}`,
-        flags: MessageFlags.Ephemeral
+      await interaction.editReply({
+        content: `นำเข้าปาร์ตี้ #${importedParty.id} เรียบร้อยแล้ว สมาชิกจากยศ ${role} ถูกผูกเข้าระบบแล้ว${importedParty.members.length ? ` (${importedParty.members.length} คน)` : ""}`
       })
 
       return
