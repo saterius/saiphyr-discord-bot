@@ -20,6 +20,8 @@ const OPEN_PARTY_STATUSES = [
   PARTY_STATUS.ACTIVE,
   PARTY_STATUS.SCHEDULED
 ]
+const IMPORTED_CLASS_KEY = "unknown"
+const IMPORTED_CLASS_LABEL = "ยังไม่ระบุ"
 
 function now() {
   return new Date().toISOString()
@@ -347,6 +349,163 @@ async function createParty({
       actorId: leaderId,
       action: "party_created",
       meta: { name, maxMembers, partyType, plannedStartAtUnix, plannedTimezone }
+    })
+
+    return loadPartyDetails(tx, partyId)
+  })
+}
+
+async function importParty({
+  guildId,
+  leaderId,
+  actorId,
+  name,
+  description = null,
+  partyType = PARTY_TYPE.AD_HOC,
+  plannedStartAtUnix = null,
+  plannedTimezone = null,
+  partyRoleId,
+  partyChannelId,
+  memberIds = [],
+  maxMembers = 8
+}) {
+  requireValue(guildId, "guildId is required.")
+  requireValue(leaderId, "leaderId is required.")
+  requireValue(actorId, "actorId is required.")
+  requireValue(name, "จำเป็นต้องระบุชื่อปาร์ตี้")
+  requireValue(partyRoleId, "จำเป็นต้องระบุยศของปาร์ตี้")
+  requireValue(partyChannelId, "จำเป็นต้องระบุห้องข้อความของปาร์ตี้")
+
+  if (!Number.isInteger(maxMembers) || maxMembers <= 0) {
+    throw new ServiceError("จำนวนสมาชิกสูงสุดต้องเป็นตัวเลขจำนวนเต็มที่มากกว่า 0", "VALIDATION_ERROR")
+  }
+
+  if (!Object.values(PARTY_TYPE).includes(partyType)) {
+    throw new ServiceError("ประเภทปาร์ตี้ไม่ถูกต้อง", "VALIDATION_ERROR", { partyType })
+  }
+
+  return withTransaction("write", async (tx) => {
+    const conflictingParty = await getOne(
+      tx,
+      `
+        SELECT id, name
+        FROM parties
+        WHERE party_role_id = ?
+           OR party_channel_id = ?
+        LIMIT 1
+      `,
+      [partyRoleId, partyChannelId]
+    )
+
+    if (conflictingParty) {
+      throw new ServiceError(
+        `role หรือห้องนี้ถูกผูกกับปาร์ตี้ #${conflictingParty.id} (${conflictingParty.name}) อยู่แล้ว`,
+        "PARTY_RESOURCE_ALREADY_LINKED",
+        {
+          conflictingPartyId: conflictingParty.id,
+          partyRoleId,
+          partyChannelId
+        }
+      )
+    }
+
+    const normalizedMemberIds = [...new Set(
+      [leaderId, ...memberIds]
+        .filter((memberId) => memberId !== undefined && memberId !== null && memberId !== "")
+        .map((memberId) => String(memberId))
+    )]
+
+    if (!normalizedMemberIds.length) {
+      throw new ServiceError("ต้องมีสมาชิกอย่างน้อย 1 คนสำหรับการนำเข้าปาร์ตี้", "VALIDATION_ERROR")
+    }
+
+    if (normalizedMemberIds.length > maxMembers) {
+      throw new ServiceError(
+        `จำนวนสมาชิกที่นำเข้า (${normalizedMemberIds.length}) มากกว่าจำนวนสมาชิกสูงสุด (${maxMembers})`,
+        "PARTY_IMPORT_EXCEEDS_MAX_MEMBERS",
+        { memberCount: normalizedMemberIds.length, maxMembers }
+      )
+    }
+
+    const createdAt = now()
+
+    const result = await run(
+      tx,
+      `
+        INSERT INTO parties (
+          guild_id,
+          leader_id,
+          party_role_id,
+          party_channel_id,
+          name,
+          description,
+          party_type,
+          planned_start_at_unix,
+          planned_timezone,
+          max_members,
+          status,
+          locked_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        guildId,
+        leaderId,
+        partyRoleId,
+        partyChannelId,
+        name,
+        description,
+        partyType,
+        plannedStartAtUnix,
+        plannedTimezone,
+        maxMembers,
+        PARTY_STATUS.ACTIVE,
+        createdAt
+      ]
+    )
+
+    const partyId = result.lastInsertRowid
+
+    for (const [index, memberId] of normalizedMemberIds.entries()) {
+      await run(
+        tx,
+        `
+          INSERT INTO party_members (
+            party_id,
+            user_id,
+            class_key,
+            class_label,
+            slot_number,
+            join_status,
+            joined_at,
+            confirmed_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          partyId,
+          memberId,
+          IMPORTED_CLASS_KEY,
+          IMPORTED_CLASS_LABEL,
+          index + 1,
+          MEMBER_STATUS.CONFIRMED,
+          createdAt,
+          createdAt
+        ]
+      )
+    }
+
+    await insertPartyLog(tx, {
+      partyId,
+      actorId,
+      action: "party_imported",
+      meta: {
+        name,
+        partyType,
+        partyRoleId,
+        partyChannelId,
+        importedMemberCount: normalizedMemberIds.length
+      }
     })
 
     return loadPartyDetails(tx, partyId)
@@ -966,6 +1125,7 @@ module.exports = {
   getPartyByChannelId,
   getPartyById,
   getPartyByRecruitMessageId,
+  importParty,
   joinParty,
   kickPartyMember,
   leaveParty,
