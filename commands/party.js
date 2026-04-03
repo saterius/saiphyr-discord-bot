@@ -87,7 +87,7 @@ module.exports = {
         .setDescription("สร้างโพสต์รับสมาชิกเข้าปาร์ตี้")
         .addStringOption((option) =>
           option
-            .setName("name")
+            .setName("party_name")
             .setDescription("ชื่อปาร์ตี้")
             .setRequired(true)
         )
@@ -271,7 +271,7 @@ module.exports = {
     const subcommand = interaction.options.getSubcommand()
 
     if (subcommand === "create") {
-      const name = interaction.options.getString("name")
+      const name = interaction.options.getString("party_name")
       const description = interaction.options.getString("description")
       const partyType = interaction.options.getString("type")
       const year = interaction.options.getInteger("year")
