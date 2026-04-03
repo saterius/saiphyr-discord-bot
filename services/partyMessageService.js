@@ -95,11 +95,13 @@ async function provisionPartyAndAnnounce(client, partyId) {
     parentId: recruitChannel?.parentId || null
   })
 
-  if (provisioned.channel?.isTextBased()) {
-    await provisioned.channel.send({
+  if (recruitChannel?.isTextBased()) {
+    await recruitChannel.send({
       content: buildPartyActivationNotice(provisioned.party)
     }).catch(() => null)
+  }
 
+  if (provisioned.channel?.isTextBased()) {
     const plannedTimeNotice = buildPartyPlannedTimeNotice(provisioned.party)
     if (plannedTimeNotice) {
       await provisioned.channel.send({
