@@ -1,4 +1,5 @@
 const {
+  ChannelType,
   MessageFlags,
   PermissionFlagsBits,
   SlashCommandBuilder
@@ -145,6 +146,93 @@ module.exports = {
           option
             .setName("max_members")
             .setDescription("จำนวนผู้เล่น")
+            .setMinValue(2)
+            .setMaxValue(8)
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("import")
+        .setDescription("ผูกปาร์ตี้เดิมที่มี role และห้องอยู่แล้วเข้ากับระบบ")
+        .addStringOption((option) =>
+          option
+            .setName("party_name")
+            .setDescription("ชื่อปาร์ตี้")
+            .setRequired(true)
+        )
+        .addStringOption((option) =>
+          option
+            .setName("type")
+            .setDescription("เลือกประเภทของปาร์ตี้")
+            .setRequired(true)
+            .addChoices(
+              { name: "ประจำ", value: PARTY_TYPE.STATIC },
+              { name: "เฉพาะกิจ", value: PARTY_TYPE.AD_HOC }
+            )
+        )
+        .addUserOption((option) =>
+          option
+            .setName("leader")
+            .setDescription("หัวหน้าปาร์ตี้")
+            .setRequired(true)
+        )
+        .addRoleOption((option) =>
+          option
+            .setName("role")
+            .setDescription("ยศของปาร์ตี้ที่มีอยู่แล้ว")
+            .setRequired(true)
+        )
+        .addChannelOption((option) =>
+          option
+            .setName("channel")
+            .setDescription("ห้องข้อความของปาร์ตี้ที่มีอยู่แล้ว")
+            .addChannelTypes(ChannelType.GuildText)
+            .setRequired(true)
+        )
+        .addStringOption((option) =>
+          option
+            .setName("description")
+            .setDescription("คำอธิบายปาร์ตี้")
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("year")
+            .setDescription("ปีสำหรับปาร์ตี้เฉพาะกิจ")
+            .setMinValue(2025)
+            .setMaxValue(2100)
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("month")
+            .setDescription("เดือนสำหรับปาร์ตี้เฉพาะกิจ")
+            .setMinValue(1)
+            .setMaxValue(12)
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("day")
+            .setDescription("วันที่สำหรับปาร์ตี้เฉพาะกิจ")
+            .setMinValue(1)
+            .setMaxValue(31)
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("hour")
+            .setDescription("ชั่วโมงสำหรับปาร์ตี้เฉพาะกิจ")
+            .setMinValue(0)
+            .setMaxValue(23)
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("minute")
+            .setDescription("นาทีสำหรับปาร์ตี้เฉพาะกิจ")
+            .setMinValue(0)
+            .setMaxValue(59)
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("max_members")
+            .setDescription("จำนวนสมาชิกสูงสุด")
             .setMinValue(2)
             .setMaxValue(8)
         )
@@ -349,6 +437,74 @@ module.exports = {
       await interaction.editReply({
         content: `สร้างปาร์ตี้ #${party.id} (${formatPartyType(party.party_type)}) แล้ว กรุณาเลือกอาชีพของหัวหน้าปาร์ตี้ก่อนเพื่อโพสต์รับสมาชิก`,
         components: [buildClassSelectRow(party.id, `party:create_class:${party.id}`)]
+      })
+
+      return
+    }
+
+    if (subcommand === "import") {
+      if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels)) {
+        throw new ServiceError(
+          "คำสั่ง /party import ใช้ได้เฉพาะผู้ดูแลที่มีสิทธิ์จัดการแชนแนล",
+          "MISSING_PERMISSIONS"
+        )
+      }
+
+      const name = interaction.options.getString("party_name")
+      const description = interaction.options.getString("description")
+      const partyType = interaction.options.getString("type")
+      const leader = interaction.options.getUser("leader")
+      const role = interaction.options.getRole("role")
+      const channel = interaction.options.getChannel("channel")
+      const year = interaction.options.getInteger("year")
+      const month = interaction.options.getInteger("month")
+      const day = interaction.options.getInteger("day")
+      const hour = interaction.options.getInteger("hour")
+      const minute = interaction.options.getInteger("minute")
+      const maxMembers = interaction.options.getInteger("max_members") || 8
+
+      const hasFullPlannedTime = [year, month, day, hour, minute].every((value) => value !== null)
+      const hasAnyPlannedTime = [year, month, day, hour, minute].some((value) => value !== null)
+
+      if (partyType === PARTY_TYPE.AD_HOC && !hasFullPlannedTime) {
+        throw new ServiceError(
+          "ปาร์ตี้เฉพาะกิจต้องระบุ ปี เดือน วัน ชั่วโมง และนาที ให้ครบก่อนนำเข้าปาร์ตี้",
+          "AD_HOC_TIME_REQUIRED"
+        )
+      }
+
+      if (hasAnyPlannedTime && !hasFullPlannedTime) {
+        throw new ServiceError(
+          "ถ้าจะใส่เวลานัด กรุณาใส่ ปี เดือน วัน ชั่วโมง และนาที ให้ครบ",
+          "INCOMPLETE_PARTY_TIME"
+        )
+      }
+
+      const plannedStartAtUnix = hasFullPlannedTime
+        ? buildBangkokUnixTimestamp(year, month, day, hour, minute)
+        : null
+
+      await interaction.guild.members.fetch().catch(() => null)
+
+      const roleMemberIds = [...role.members.keys()]
+      const importedParty = await partyService.importParty({
+        guildId: interaction.guildId,
+        leaderId: leader.id,
+        actorId: interaction.user.id,
+        name,
+        description,
+        partyType,
+        plannedStartAtUnix,
+        plannedTimezone: plannedStartAtUnix ? "Asia/Bangkok" : null,
+        partyRoleId: role.id,
+        partyChannelId: channel.id,
+        memberIds: roleMemberIds,
+        maxMembers
+      })
+
+      await interaction.reply({
+        content: `นำเข้าปาร์ตี้ #${importedParty.id} เรียบร้อยแล้ว สมาชิกจากยศ ${role} ถูกผูกเข้าระบบแล้ว${importedParty.members.length ? ` (${importedParty.members.length} คน)` : ""}`,
+        flags: MessageFlags.Ephemeral
       })
 
       return
