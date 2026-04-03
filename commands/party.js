@@ -715,7 +715,7 @@ module.exports = {
       }
 
       const perMember = netTotal / memberCount
-      const stampBonus = stampCount > 0 ? stampCost / memberCount : 0
+      const stampBonus = stampCount > 0 ? stampCost : 0
       const currentParty = await partyService.getPartyByChannelId(interaction.channelId).catch(() => null)
       const roleMention = currentParty?.party_role_id ? `<@&${currentParty.party_role_id}>` : null
       const content = [
