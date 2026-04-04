@@ -1,4 +1,4 @@
-const {
+﻿const {
   db,
   getMany,
   getOne,
@@ -936,7 +936,7 @@ async function closePartyRecruitment({
     const party = await getPartyRecord(tx, partyId)
     ensurePartyOpenForRosterChanges(party)
 
-    if (party.leader_id !== actorId) {
+    if (!allowNonLeader && party.leader_id !== actorId) {
       throw new ServiceError(
         "หัวหน้าปาร์ตี้เท่านั้นที่จะปิดรับสมัครสมาชิกก่อนได้.",
         "NOT_PARTY_LEADER",
@@ -1231,7 +1231,7 @@ async function updatePartyStatus({
   return withTransaction("write", async (tx) => {
     const party = await getPartyRecord(tx, partyId)
 
-    if (party.leader_id !== actorId) {
+    if (!allowNonLeader && party.leader_id !== actorId) {
       throw new ServiceError(
         "หัวหน้าปาร์ตี้เท่านั้นที่เปลี่ยนสถานะปาร์ตี้ได้",
         "NOT_PARTY_LEADER",
