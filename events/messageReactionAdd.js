@@ -30,7 +30,7 @@ module.exports = {
       }
 
       const party = await partyService.getPartyById(calculation.party_id).catch(() => null)
-      if (!party || party.party_channel_id !== reaction.message.channelId) {
+      if (!party || calculation.channel_id !== reaction.message.channelId) {
         return
       }
 
