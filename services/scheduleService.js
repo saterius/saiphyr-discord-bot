@@ -600,6 +600,74 @@ async function cancelScheduleEvent({
   })
 }
 
+async function lockScheduleEvent({
+  eventId,
+  actorId,
+  reason = "Locked manually."
+}) {
+  requireValue(eventId, "eventId is required.")
+  requireValue(actorId, "actorId is required.")
+
+  return withTransaction("write", async (tx) => {
+    const event = await getScheduleEventRecord(tx, eventId)
+    const party = await getPartyForScheduling(tx, event.party_id)
+
+    if (party.leader_id !== actorId && event.creator_id !== actorId) {
+      throw new ServiceError(
+        "หัวหน้าปาร์ตี้หรือคนที่สร้างตารางนัดนี้เท่านั้นที่ล็อกตารางได้",
+        "NOT_SCHEDULE_MANAGER",
+        { eventId, actorId }
+      )
+    }
+
+    if (event.status === SCHEDULE_STATUS.LOCKED) {
+      return loadScheduleEventDetails(tx, eventId)
+    }
+
+    if (event.status !== SCHEDULE_STATUS.VOTING) {
+      throw new ServiceError(
+        "ล็อกได้เฉพาะตารางที่กำลังโหวตอยู่เท่านั้น",
+        "SCHEDULE_NOT_VOTING",
+        { eventId, status: event.status }
+      )
+    }
+
+    const lockedAt = now()
+
+    await run(
+      tx,
+      `
+        UPDATE schedule_events
+        SET status = ?,
+            locked_at = ?
+        WHERE id = ?
+      `,
+      [SCHEDULE_STATUS.LOCKED, lockedAt, eventId]
+    )
+
+    await run(
+      tx,
+      `
+        UPDATE parties
+        SET status = ?
+        WHERE id = ?
+          AND status IN (?, ?)
+      `,
+      [PARTY_STATUS.SCHEDULED, event.party_id, PARTY_STATUS.ACTIVE, PARTY_STATUS.SCHEDULED]
+    )
+
+    await insertScheduleLog(tx, {
+      partyId: event.party_id,
+      actorId,
+      action: "schedule_locked_manually",
+      scheduleEventId: eventId,
+      meta: { reason, lockedAt }
+    })
+
+    return loadScheduleEventDetails(tx, eventId)
+  })
+}
+
 async function completeScheduleEvent({
   eventId,
   actorId,
@@ -908,6 +976,7 @@ module.exports = {
   listScheduleEventsNeedingCompletionPrompt,
   listVotingScheduleEventsPastDue,
   listPartyScheduleEvents,
+  lockScheduleEvent,
   markScheduleCompletionPromptSent,
   autoCancelScheduleEvent,
   updateScheduleMessages,

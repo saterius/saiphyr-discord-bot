@@ -119,6 +119,10 @@ function getButtonLockKey(interaction) {
     return `schedule:cancel:${parts[0]}:${interaction.user.id}`
   }
 
+  if (scope === "schedule" && action === "lock") {
+    return `schedule:lock:${parts[0]}`
+  }
+
   if (scope === "schedule" && action === "complete") {
     return `schedule:complete:${parts[0]}`
   }
@@ -586,6 +590,37 @@ async function handleScheduleButton(interaction) {
 
     await interaction.editReply({
       content: `ยกเลิกตารางนัดเวลา #${eventId} เรียบร้อยแล้ว`
+    })
+
+    return true
+  }
+
+  if (action === "lock") {
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+
+    const event = await scheduleService.getScheduleEventById(eventId)
+
+    if (event.leader_id !== interaction.user.id && event.creator_id !== interaction.user.id) {
+      throw new ServiceError(
+        "หัวหน้าปาร์ตี้หรือคนที่สร้างตารางนัดนี้เท่านั้นที่ล็อกตารางได้",
+        "NOT_SCHEDULE_MANAGER",
+        { eventId, actorId: interaction.user.id }
+      )
+    }
+
+    await scheduleService.lockScheduleEvent({
+      eventId,
+      actorId: interaction.user.id,
+      reason: "ล็อกจากปุ่มบนโพสต์ตารางนัด"
+    })
+
+    await refreshScheduleVoteMessage(interaction.client, eventId)
+    await syncGuildScheduleBoard(interaction.client, event.guild_id)
+
+    await interaction.editReply({
+      content: `ล็อกตารางนัดเวลา #${eventId} เรียบร้อยแล้ว`
     })
 
     return true
