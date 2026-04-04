@@ -98,6 +98,10 @@ function getButtonLockKey(interaction) {
       return `party:close_recruitment:${parts[0]}`
     }
 
+    if (action === "activate_now") {
+      return `party:activate_now:${parts[0]}`
+    }
+
     if (action === "cancel") {
       return `party:cancel:${parts[0]}:${interaction.user.id}`
     }
@@ -392,6 +396,29 @@ async function handlePartyButton(interaction) {
 
     await interaction.editReply({
       content: `ปาร์ตี้ #${partyId} ปิดรับสมัครแล้ว และส่งคำขอยืนยันให้สมาชิกทั้ง ${result.party.active_member_count} คนเรียบร้อย`
+    })
+
+    return true
+  }
+
+  if (action === "activate_now") {
+    const partyId = Number(parts[0])
+
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+
+    await partyService.activatePartyNow({
+      partyId,
+      actorId: interaction.user.id,
+      reason: "เปิดปาร์ตี้ทันทีจากโพสต์รับสมาชิก"
+    })
+
+    await provisionPartyAndAnnounce(interaction.client, partyId)
+    await refreshPartyRecruitmentMessage(interaction.client, partyId)
+
+    await interaction.editReply({
+      content: `เปิดปาร์ตี้ #${partyId} ทันทีเรียบร้อยแล้ว โดยข้ามขั้นตอนรอยืนยันของสมาชิก`
     })
 
     return true
