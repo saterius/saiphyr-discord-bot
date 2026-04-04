@@ -1,4 +1,4 @@
-const {
+﻿const {
   MessageFlags,
   SlashCommandBuilder
 } = require("discord.js")
@@ -19,7 +19,7 @@ const {
 function ensurePartyChannel(interaction, party) {
   if (!party) {
     throw new ServiceError(
-      "ใช้คำสั่ง /schedule ได้แค่ในช่องของปาร์ตี้เท่านั้น.",
+      "ใช้คำสั่ง /schedule ได้แค่ในช่องของปาร์ตี้เท่านั้น",
       "INVALID_SCHEDULE_CHANNEL",
       { actualChannelId: interaction.channelId }
     )
@@ -44,7 +44,7 @@ function buildBangkokUnixTimestamp(year, month, day, hour, minute) {
     bangkokDate.getUTCMinutes() !== minute
   ) {
     throw new ServiceError(
-      "รูปแบบของวันที่หรือเวลาไม่ถูกต้อง. กรุณาตรวจสอบอีกครั้ง.",
+      "รูปแบบของวันที่หรือเวลาไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง",
       "INVALID_SCHEDULE_DATETIME",
       { year, month, day, hour, minute }
     )
@@ -60,7 +60,7 @@ function formatBangkokDateText(year, month, day, hour, minute) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("schedule")
-    .setDescription("จัดการโหวตตารางของปาร์ตี้")
+    .setDescription("จัดการโหวตตารางเวลาของปาร์ตี้")
     .addSubcommand((subcommand) =>
       subcommand
         .setName("create")
@@ -125,6 +125,16 @@ module.exports = {
             .setName("reason")
             .setDescription("เหตุผลที่ยกเลิก")
         )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("lock")
+        .setDescription("ล็อกตารางนัดเวลาแม้ยังยอมรับไม่ครบทุกคน")
+        .addStringOption((option) =>
+          option
+            .setName("reason")
+            .setDescription("เหตุผลที่ต้องล็อกตารางทันที")
+        )
     ),
 
   async execute(interaction) {
@@ -144,7 +154,7 @@ module.exports = {
 
       if (!scheduleConfig?.board_channel_id) {
         throw new ServiceError(
-          "ยังไม่ได้เลือกแชนแนลสำหรับช่องตารางเวลา. โปรดแจ้งผู้ดูแลให้ตั้งค่า /setscheduleboard ก่อน.",
+          "ยังไม่ได้เลือกแชนแนลสำหรับช่องตารางเวลา โปรดแจ้งผู้ดูแลให้ตั้งค่า /setscheduleboard ก่อน",
           "SCHEDULE_BOARD_NOT_CONFIGURED",
           { guildId: interaction.guildId }
         )
@@ -181,7 +191,7 @@ module.exports = {
       })
 
       await interaction.editReply({
-        content: `ตารางเวลา #${event.id} ถูกสร้างแล้ว. บอร์ด: <#${resolvedBoardChannelId}>`
+        content: `ตารางเวลา #${event.id} ถูกสร้างแล้ว บอร์ด: <#${resolvedBoardChannelId}>`
       })
 
       return
@@ -193,7 +203,7 @@ module.exports = {
 
       if (!event) {
         throw new ServiceError(
-          "ปาร์ตี้นี้ยังไม่มีการนัดตารางเวลา.",
+          "ปาร์ตี้นี้ยังไม่มีการนัดตารางเวลา",
           "SCHEDULE_NOT_FOUND",
           { partyId: party.id }
         )
@@ -216,7 +226,7 @@ module.exports = {
 
       if (!event) {
         throw new ServiceError(
-          "ปาร์ตี้นี้ไม่มีการนัดตารางเวลาที่ต้องการยกเลิก.",
+          "ปาร์ตี้นี้ไม่มีการนัดตารางเวลาที่ต้องการยกเลิก",
           "SCHEDULE_NOT_FOUND",
           { partyId: party.id }
         )
@@ -232,7 +242,46 @@ module.exports = {
       await syncGuildScheduleBoard(interaction.client, interaction.guildId)
 
       await interaction.editReply({
-        content: `ตารางเวลา #${event.id} ถูกยกเลิก.`
+        content: `ตารางเวลา #${event.id} ถูกยกเลิกแล้ว`
+      })
+
+      return
+    }
+
+    if (subcommand === "lock") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+
+      const reason = interaction.options.getString("reason") || "Locked manually."
+      const party = await resolvePartyFromChannel(interaction)
+      const event = await scheduleService.getVotingScheduleEventForParty(party.id)
+
+      if (!event) {
+        throw new ServiceError(
+          "ปาร์ตี้นี้ไม่มีตารางที่กำลังโหวตและพร้อมให้ล็อก",
+          "SCHEDULE_NOT_FOUND",
+          { partyId: party.id }
+        )
+      }
+
+      if (event.leader_id !== interaction.user.id && event.creator_id !== interaction.user.id) {
+        throw new ServiceError(
+          "หัวหน้าปาร์ตี้หรือคนที่สร้างตารางนัดนี้เท่านั้นที่ล็อกตารางได้",
+          "NOT_SCHEDULE_MANAGER",
+          { eventId: event.id, actorId: interaction.user.id }
+        )
+      }
+
+      await scheduleService.lockScheduleEvent({
+        eventId: event.id,
+        actorId: interaction.user.id,
+        reason
+      })
+
+      await refreshScheduleVoteMessage(interaction.client, event.id)
+      await syncGuildScheduleBoard(interaction.client, interaction.guildId)
+
+      await interaction.editReply({
+        content: `ล็อกตารางนัดเวลา #${event.id} เรียบร้อยแล้ว`
       })
     }
   }

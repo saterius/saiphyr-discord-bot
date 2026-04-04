@@ -479,6 +479,7 @@ function buildScheduleBoardOverviewEmbeds(entries, guildId) {
 
 function buildScheduleActionRows(event) {
   const voteDisabled = event.status !== SCHEDULE_STATUS.VOTING
+  const lockDisabled = event.status !== SCHEDULE_STATUS.VOTING
   const cancelDisabled = [SCHEDULE_STATUS.CANCELLED, SCHEDULE_STATUS.EXPIRED].includes(event.status)
 
   return [
@@ -493,6 +494,11 @@ function buildScheduleActionRows(event) {
         .setLabel("ปฏิเสธ")
         .setStyle(ButtonStyle.Danger)
         .setDisabled(voteDisabled),
+      new ButtonBuilder()
+        .setCustomId(`schedule:lock:${event.id}`)
+        .setLabel("ล็อกตาราง")
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(lockDisabled),
       new ButtonBuilder()
         .setCustomId(`schedule:cancel:${event.id}`)
         .setLabel("ยกเลิกตาราง")
