@@ -80,41 +80,6 @@ async function getPartyCalculationById(id, executor = db) {
   )
 }
 
-async function getPartyCalculationByMessageId(messageId) {
-  requireValue(messageId, "messageId is required.")
-
-  return getOne(
-    db,
-    `
-      SELECT *
-      FROM party_calculations
-      WHERE message_id = ?
-    `,
-    [messageId]
-  )
-}
-
-async function markSuggestionSent(id) {
-  requireValue(id, "id is required.")
-
-  return withTransaction("write", async (tx) => {
-    await run(
-      tx,
-      `
-        UPDATE party_calculations
-        SET suggestion_sent = 1,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `,
-      [id]
-    )
-
-    return getPartyCalculationById(id, tx)
-  })
-}
-
 module.exports = {
-  createPartyCalculation,
-  getPartyCalculationByMessageId,
-  markSuggestionSent
+  createPartyCalculation
 }
