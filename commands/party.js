@@ -798,7 +798,8 @@ module.exports = {
           guild: interaction.guild,
           partyId: currentParty.id,
           actorId: interaction.user.id,
-          reason: "Auto-finished after /party cal for ad-hoc party"
+          reason: "Auto-finished after /party cal for ad-hoc party",
+          allowNonLeader: true
         })
 
         await refreshPartyRecruitmentMessage(interaction.client, currentParty.id)

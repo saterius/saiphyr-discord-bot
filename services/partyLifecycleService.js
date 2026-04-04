@@ -33,7 +33,8 @@ async function finishParty({
   guild,
   partyId,
   actorId,
-  reason = "Party finished"
+  reason = "Party finished",
+  allowNonLeader = false
 }) {
   if (!guild) {
     throw new ServiceError("guild is required.", "VALIDATION_ERROR")
@@ -61,7 +62,8 @@ async function finishParty({
     partyId,
     actorId,
     status: "closed",
-    reason
+    reason,
+    allowNonLeader
   })
 
   const removedRole = await safeDeleteRole(guild, party.party_role_id, `Finishing party ${partyId}`)
