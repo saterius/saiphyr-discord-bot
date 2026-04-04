@@ -74,6 +74,14 @@ function getButtonLockKey(interaction) {
       return `party:join:confirm:${parts[1]}:${interaction.user.id}`
     }
 
+    if (action === "change_class" && parts[0] === "start") {
+      return `party:change_class:start:${parts[1]}:${interaction.user.id}`
+    }
+
+    if (action === "change_class" && parts[0] === "confirm") {
+      return `party:change_class:confirm:${parts[1]}:${interaction.user.id}`
+    }
+
     if (action === "confirm") {
       return `party:confirm:${parts[0]}:${interaction.user.id}`
     }
@@ -251,6 +259,47 @@ async function handlePartyButton(interaction) {
 
     await interaction.editReply({
       content: `คุณได้เข้าร่วมปาร์ตี้ #${partyId} ด้วยอาชีพ ${classOption?.label || classKey}`,
+      components: []
+    })
+
+    return true
+  }
+
+  if (action === "change_class" && parts[0] === "start") {
+    const partyId = Number(parts[1])
+
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+
+    const party = await partyService.getPartyById(partyId)
+
+    await interaction.editReply({
+      content: `เลือกอาชีพใหม่ของคุณสำหรับปาร์ตี้ #${partyId} (${party.name})`,
+      components: [buildClassSelectRow(partyId, `party:change_class:${partyId}`)]
+    })
+
+    return true
+  }
+
+  if (action === "change_class" && parts[0] === "confirm") {
+    const partyId = Number(parts[1])
+    const classKey = parts[2]
+    const classOption = getClassOption(classKey)
+
+    await interaction.deferUpdate()
+
+    await partyService.updatePartyMemberClass({
+      partyId,
+      userId: interaction.user.id,
+      classKey,
+      classLabel: classOption?.label || classKey
+    })
+
+    await refreshPartyRecruitmentMessage(interaction.client, partyId)
+
+    await interaction.editReply({
+      content: `เปลี่ยนอาชีพในปาร์ตี้ #${partyId} เป็น ${classOption?.label || classKey} เรียบร้อยแล้ว`,
       components: []
     })
 
@@ -500,6 +549,24 @@ async function handlePartyClassSelect(interaction) {
         restartCustomId: `party:create_restart:${partyId}`,
         confirmLabel: "ยืนยันและโพสต์รับสมาชิก",
         restartLabel: "เปลี่ยนอาชีพ"
+      })
+    })
+
+    return true
+  }
+
+  if (action === "change_class") {
+    const partyId = Number(partyIdValue)
+    const classKey = interaction.values[0]
+    const classOption = getClassOption(classKey)
+
+    await interaction.update({
+      content: `อาชีพใหม่ที่เลือก: ${classOption?.label || classKey} กรุณากดปุ่ม "ยืนยันการเปลี่ยนอาชีพ" สำหรับปาร์ตี้ #${partyId}`,
+      components: buildJoinConfirmRows(partyId, classKey, {
+        confirmCustomId: `party:change_class:confirm:${partyId}:${classKey}`,
+        restartCustomId: `party:change_class:start:${partyId}`,
+        confirmLabel: "ยืนยันการเปลี่ยนอาชีพ",
+        restartLabel: "เลือกใหม่"
       })
     })
 

@@ -228,6 +228,7 @@ function buildPartyActionRows(party) {
     .includes(party.status)
   const joinDisabled = isClosed || party.status !== PARTY_STATUS.RECRUITING
   const confirmDisabled = party.status !== PARTY_STATUS.PENDING_CONFIRM
+  const changeClassDisabled = ![PARTY_STATUS.RECRUITING, PARTY_STATUS.PENDING_CONFIRM].includes(party.status)
   const leaveDisabled = [PARTY_STATUS.CLOSED, PARTY_STATUS.CANCELLED].includes(party.status)
   const closeRecruitmentDisabled = party.status !== PARTY_STATUS.RECRUITING
   const cancelDisabled = [PARTY_STATUS.CLOSED, PARTY_STATUS.CANCELLED].includes(party.status)
@@ -244,14 +245,15 @@ function buildPartyActionRows(party) {
       .setStyle(ButtonStyle.Success)
       .setDisabled(confirmDisabled),
     new ButtonBuilder()
+      .setCustomId(`party:change_class:start:${party.id}`)
+      .setLabel("เปลี่ยนอาชีพ")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(changeClassDisabled),
+    new ButtonBuilder()
       .setCustomId(`party:leave:${party.id}`)
       .setLabel("ออกจากปาร์ตี้")
       .setStyle(ButtonStyle.Danger)
-      .setDisabled(leaveDisabled),
-    new ButtonBuilder()
-      .setCustomId(`party:refresh:${party.id}`)
-      .setLabel("รีเฟรช")
-      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(leaveDisabled)
   )
 
   const secondaryRow = new ActionRowBuilder().addComponents(
@@ -264,7 +266,11 @@ function buildPartyActionRows(party) {
       .setCustomId(`party:cancel:${party.id}`)
       .setLabel("ยกเลิกปาร์ตี้")
       .setStyle(ButtonStyle.Danger)
-      .setDisabled(cancelDisabled)
+      .setDisabled(cancelDisabled),
+    new ButtonBuilder()
+      .setCustomId(`party:refresh:${party.id}`)
+      .setLabel("รีเฟรช")
+      .setStyle(ButtonStyle.Secondary)
   )
 
   return [primaryRow, secondaryRow]

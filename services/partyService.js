@@ -1036,6 +1036,66 @@ async function leaveParty({
   })
 }
 
+async function updatePartyMemberClass({
+  partyId,
+  userId,
+  classKey,
+  classLabel = null
+}) {
+  requireValue(partyId, "partyId is required.")
+  requireValue(userId, "userId is required.")
+  requireValue(classKey, "classKey is required.")
+
+  return withTransaction("write", async (tx) => {
+    const party = await getPartyRecord(tx, partyId)
+    ensurePartyOpenForRosterChanges(party)
+
+    if (![PARTY_STATUS.RECRUITING, PARTY_STATUS.PENDING_CONFIRM].includes(party.status)) {
+      throw new ServiceError(
+        "ปาร์ตี้นี้ยังไม่อยู่ในช่วงที่เปลี่ยนอาชีพได้",
+        "PARTY_CLASS_CHANGE_NOT_ALLOWED",
+        { partyId, status: party.status }
+      )
+    }
+
+    const member = await getPartyMember(tx, partyId, userId)
+    if (!member || !ACTIVE_MEMBER_STATUSES.includes(member.join_status)) {
+      throw new ServiceError(
+        "คุณไม่ได้เป็นสมาชิกที่กำลังใช้งานอยู่ของปาร์ตี้นี้",
+        "MEMBER_NOT_FOUND",
+        { partyId, userId }
+      )
+    }
+
+    await run(
+      tx,
+      `
+        UPDATE party_members
+        SET class_key = ?,
+            class_label = ?
+        WHERE party_id = ?
+          AND user_id = ?
+      `,
+      [classKey, classLabel, partyId, userId]
+    )
+
+    await insertPartyLog(tx, {
+      partyId,
+      actorId: userId,
+      action: "member_class_updated",
+      targetUserId: userId,
+      meta: {
+        previousClassKey: member.class_key,
+        previousClassLabel: member.class_label,
+        classKey,
+        classLabel
+      }
+    })
+
+    return loadPartyDetails(tx, partyId)
+  })
+}
+
 async function updatePartyResources({
   partyId,
   partyRoleId = null,
@@ -1131,6 +1191,7 @@ module.exports = {
   leaveParty,
   listGuildParties,
   respondPartyConfirmation,
+  updatePartyMemberClass,
   updatePartyResources,
   updatePartyStatus
 }
