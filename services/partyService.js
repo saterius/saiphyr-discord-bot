@@ -837,6 +837,94 @@ async function respondPartyConfirmation({
   })
 }
 
+async function activatePartyNow({
+  partyId,
+  actorId,
+  reason = "activated_by_leader"
+}) {
+  requireValue(partyId, "partyId is required.")
+  requireValue(actorId, "actorId is required.")
+
+  return withTransaction("write", async (tx) => {
+    const party = await getPartyRecord(tx, partyId)
+    ensurePartyOpenForRosterChanges(party)
+
+    if (party.leader_id !== actorId) {
+      throw new ServiceError(
+        "หัวหน้าปาร์ตี้เท่านั้นที่เปิดปาร์ตี้ได้ทันที",
+        "NOT_PARTY_LEADER",
+        { partyId, actorId }
+      )
+    }
+
+    if (![PARTY_STATUS.RECRUITING, PARTY_STATUS.PENDING_CONFIRM].includes(party.status)) {
+      throw new ServiceError(
+        "ปาร์ตี้นี้ยังไม่อยู่ในสถานะที่เปิดใช้งานได้ทันที",
+        "PARTY_NOT_READY_FOR_FORCE_ACTIVATION",
+        { partyId, status: party.status }
+      )
+    }
+
+    const stats = await getPartyStats(tx, partyId)
+
+    if (stats.activeMemberCount <= 0) {
+      throw new ServiceError(
+        "ปาร์ตี้ต้องมีสมาชิกอย่างน้อย 1 คนก่อนเปิดใช้งานทันที",
+        "PARTY_EMPTY",
+        { partyId }
+      )
+    }
+
+    const activatedAt = now()
+
+    await run(
+      tx,
+      `
+        UPDATE party_members
+        SET join_status = ?,
+            confirmed_at = COALESCE(confirmed_at, ?)
+        WHERE party_id = ?
+          AND join_status IN (?, ?)
+      `,
+      [MEMBER_STATUS.CONFIRMED, activatedAt, partyId, MEMBER_STATUS.JOINED, MEMBER_STATUS.CONFIRMED]
+    )
+
+    await run(
+      tx,
+      `
+        DELETE FROM party_confirmations
+        WHERE party_id = ?
+      `,
+      [partyId]
+    )
+
+    await run(
+      tx,
+      `
+        UPDATE parties
+        SET status = ?,
+            locked_at = ?
+        WHERE id = ?
+      `,
+      [PARTY_STATUS.ACTIVE, activatedAt, partyId]
+    )
+
+    await insertPartyLog(tx, {
+      partyId,
+      actorId,
+      action: "party_force_activated",
+      meta: {
+        activatedAt,
+        reason,
+        previousStatus: party.status,
+        activeMemberCount: stats.activeMemberCount
+      }
+    })
+
+    return loadPartyDetails(tx, partyId)
+  })
+}
+
 async function closePartyRecruitment({
   partyId,
   actorId
@@ -1191,6 +1279,7 @@ module.exports = {
   leaveParty,
   listGuildParties,
   respondPartyConfirmation,
+  activatePartyNow,
   updatePartyMemberClass,
   updatePartyResources,
   updatePartyStatus
