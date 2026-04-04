@@ -1,6 +1,5 @@
 const partyService = require("./partyService")
 const scheduleService = require("./scheduleService")
-const { PARTY_TYPE } = require("./partyConstants")
 const { provisionPartyResources } = require("./partyProvisioningService")
 const {
   getScheduleBoardState,
@@ -12,7 +11,6 @@ const {
   buildPartyActivationNotice,
   buildPartyConfirmationNotice,
   buildPartyEmbed,
-  buildPartyFinishSuggestionRows,
   buildPartyPlannedTimeNotice,
   buildScheduleActionRows,
   buildScheduleBoardOverviewEmbeds,
@@ -212,31 +210,6 @@ async function announceCancelledSchedule(client, eventId) {
   return event
 }
 
-async function sendPartyFinishSuggestion(client, partyId, fallbackChannel = null) {
-  const party = await partyService.getPartyById(partyId)
-
-  if (party.party_type !== PARTY_TYPE.AD_HOC) {
-    return null
-  }
-
-  const channel = await fetchTextChannel(client, party.party_channel_id, fallbackChannel)
-
-  if (!channel || !channel.isTextBased()) {
-    return null
-  }
-
-  return channel.send({
-    content: [
-      `<@${party.leader_id}> สมาชิกกด ✅ ครบตามจำนวนคนในโพสต์สรุปยอดเงินแล้ว`,
-      "ถ้าทุกอย่างเรียบร้อยแล้ว สามารถกดปุ่มด้านล่างเพื่อเสร็จสิ้นปาร์ตี้ได้ทันที หรือใช้ /party finish ในห้องนี้ก็ได้"
-    ].join("\n"),
-    components: buildPartyFinishSuggestionRows(partyId),
-    allowedMentions: {
-      users: [party.leader_id]
-    }
-  }).catch(() => null)
-}
-
 async function sendScheduleCompletionSuggestion(client, event, fallbackChannel = null) {
   const channel = await fetchTextChannel(
     client,
@@ -264,7 +237,6 @@ module.exports = {
   refreshPartyRecruitmentMessage,
   refreshScheduleVoteMessage,
   sendScheduleCompletionSuggestion,
-  sendPartyFinishSuggestion,
   sendPartyConfirmationPrompt,
   syncGuildScheduleBoard
 }
