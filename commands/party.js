@@ -11,10 +11,14 @@ const {
 } = require("../services/partyCalculationService")
 const { finishParty } = require("../services/partyLifecycleService")
 const {
+  getCalChannelConfig,
   getPartyChannelConfig,
   getPartyFinderConfig
 } = require("../services/guildConfigService")
-const { PARTY_TYPE } = require("../services/partyConstants")
+const {
+  MEMBER_STATUS,
+  PARTY_TYPE
+} = require("../services/partyConstants")
 const ServiceError = require("../services/serviceError")
 const {
   refreshPartyRecruitmentMessage
@@ -697,9 +701,30 @@ module.exports = {
     }
 
     if (subcommand === "cal") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+
       const amountsInput = interaction.options.getString("amounts")
       const stampCount = interaction.options.getInteger("stamps")
       const memberCount = interaction.options.getInteger("members")
+      const calChannelConfig = await getCalChannelConfig(interaction.guildId)
+
+      if (!calChannelConfig?.cal_channel_id) {
+        throw new ServiceError(
+          "ยังไม่ได้เลือกแชนแนลสำหรับ /party cal โปรดแจ้งผู้ดูแลให้ตั้งค่า /setcalchannel ก่อน",
+          "PARTY_CAL_CHANNEL_NOT_CONFIGURED",
+          { guildId: interaction.guildId }
+        )
+      }
+
+      const targetChannel = await interaction.client.channels.fetch(calChannelConfig.cal_channel_id).catch(() => null)
+
+      if (!targetChannel || !targetChannel.isTextBased()) {
+        throw new ServiceError(
+          "ไม่พบแชนแนลที่ตั้งค่าไว้สำหรับ /party cal หรือบอทไม่สามารถส่งข้อความไปที่นั่นได้",
+          "PARTY_CAL_CHANNEL_UNAVAILABLE",
+          { guildId: interaction.guildId, channelId: calChannelConfig.cal_channel_id }
+        )
+      }
 
       const amounts = parseGoldExpression(amountsInput)
       const grossTotal = amounts.reduce((sum, value) => sum + value, 0)
@@ -717,10 +742,22 @@ module.exports = {
       const perMember = netTotal / memberCount
       const stampBonus = stampCount > 0 ? stampCost : 0
       const currentParty = await partyService.getPartyByChannelId(interaction.channelId).catch(() => null)
-      const roleMention = currentParty?.party_role_id ? `<@&${currentParty.party_role_id}>` : null
+      const activeMemberIds = currentParty?.party_type === PARTY_TYPE.AD_HOC
+        ? [...new Set(
+          (currentParty.members || [])
+            .filter((member) => [MEMBER_STATUS.JOINED, MEMBER_STATUS.CONFIRMED].includes(member.join_status))
+            .map((member) => member.user_id)
+        )]
+        : []
+      const mentionLine = currentParty?.party_type === PARTY_TYPE.AD_HOC
+        ? activeMemberIds.map((userId) => `<@${userId}>`).join(" ") || null
+        : (currentParty?.party_role_id ? `<@&${currentParty.party_role_id}>` : null)
       const content = [
-        roleMention,
-        "สรุปยอดเงินปาร์ตี้",
+        mentionLine,
+        currentParty?.party_type === PARTY_TYPE.AD_HOC && currentParty?.name
+          ? `ปาร์ตี้: ${currentParty.name}`
+          : null,
+        `สรุปยอดเงินปาร์ตี้ (${memberCount} คน)`,
         `รายการเงิน: ${amounts.join(" + ")} = ${formatGold(grossTotal)}`,
         `ค่าสแตมป์: ${stampCount} x 2 = ${formatGold(stampCost)}`,
         `เงินหลังหักค่าสแตมป์: ${formatGold(netTotal)}`,
@@ -729,14 +766,14 @@ module.exports = {
           ? `คนที่ออกสแตมป์จะดึงเพิ่มได้ ${formatGold(stampBonus)}`
           : "ไม่มีค่าสแตมป์ที่ต้องชดเชยเพิ่ม",
         "",
-        `ถ้าตรวจสอบยอดเรียบร้อยแล้ว ให้สมาชิกกดรีแอค ✅ ให้ครบ ${memberCount} คน`
+        `ถ้าตรวจสอบยอดเรียบร้อยแล้ว กดรีแอค ✅ เพื่อกันลืมด้วยนะครับ!`
       ].filter(Boolean).join("\n")
 
-      const message = await interaction.channel.send({
+      const message = await targetChannel.send({
         content,
-        allowedMentions: roleMention
-          ? { roles: [currentParty.party_role_id] }
-          : undefined
+        allowedMentions: currentParty?.party_type === PARTY_TYPE.AD_HOC
+          ? (activeMemberIds.length ? { users: activeMemberIds } : undefined)
+          : (currentParty?.party_role_id ? { roles: [currentParty.party_role_id] } : undefined)
       })
 
       await message.react("✅").catch(() => null)
@@ -745,7 +782,7 @@ module.exports = {
         await createPartyCalculation({
           partyId: currentParty.id,
           creatorId: interaction.user.id,
-          channelId: interaction.channelId,
+          channelId: targetChannel.id,
           messageId: message.id,
           amountsText: amounts.join("+"),
           grossTotal,
@@ -756,8 +793,40 @@ module.exports = {
         })
       }
 
+      if (currentParty?.party_type === PARTY_TYPE.AD_HOC) {
+        const result = await finishParty({
+          guild: interaction.guild,
+          partyId: currentParty.id,
+          actorId: interaction.user.id,
+          reason: "Auto-finished after /party cal for ad-hoc party",
+          allowNonLeader: true
+        })
+
+        await refreshPartyRecruitmentMessage(interaction.client, currentParty.id)
+
+        const deletedBits = []
+        if (result.removedRole) {
+          deletedBits.push("ลบ role แล้ว")
+        }
+        if (result.removedChannel) {
+          deletedBits.push("ลบ channel แล้ว")
+        }
+
+        await interaction.editReply({
+          content: `โพสต์สรุปยอดเงินถูกส่งไปที่ <#${targetChannel.id}> แล้ว และปาร์ตี้ #${currentParty.id} ถูกปิดเรียบร้อย${deletedBits.length ? ` (${deletedBits.join(", ")})` : ""}`
+        })
+
+        return
+      }
+
+      await interaction.editReply({
+        content: `โพสต์สรุปยอดเงินถูกส่งไปที่ <#${targetChannel.id}> แล้ว`
+      })
+
+      return
+
       await interaction.reply({
-        content: "โพสต์สรุปยอดเงินถูกส่งไว้ในห้องนี้แล้ว",
+        content: `โพสต์สรุปยอดเงินถูกส่งไปที่ <#${targetChannel.id}> แล้ว`,
         flags: MessageFlags.Ephemeral
       })
 

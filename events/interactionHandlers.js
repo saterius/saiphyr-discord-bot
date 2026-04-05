@@ -2,7 +2,6 @@
 
 const partyService = require("../services/partyService")
 const scheduleService = require("../services/scheduleService")
-const { finishParty } = require("../services/partyLifecycleService")
 const ServiceError = require("../services/serviceError")
 const {
   announceCancelledSchedule,
@@ -16,7 +15,6 @@ const {
 const {
   buildClassSelectRow,
   buildPartyCancelConfirmRows,
-  buildPartyFinishSuggestionRows,
   buildJoinConfirmRows,
   buildPartyActionRows,
   buildPartyEmbed,
@@ -114,13 +112,6 @@ function getButtonLockKey(interaction) {
       return `party:cancel_abort:${parts[0]}`
     }
 
-    if (action === "finish_now") {
-      return `party:finish_now:${parts[0]}`
-    }
-
-    if (action === "finish_abort") {
-      return `party:finish_abort:${parts[0]}`
-    }
   }
 
   if (scope === "schedule" && action === "vote") {
@@ -476,82 +467,6 @@ async function handlePartyButton(interaction) {
 
     await interaction.update({
       content: `ปาร์ตี้ #${partyId} ยังไม่ได้ถูกยกเลิก`,
-      components: []
-    })
-
-    return true
-  }
-
-  if (action === "finish_now") {
-    const partyId = Number(parts[0])
-
-    await interaction.deferUpdate()
-
-    const party = await partyService.getPartyById(partyId)
-
-    if (party.leader_id !== interaction.user.id) {
-      throw new ServiceError(
-        "หัวหน้าปาร์ตี้เท่านั้นที่จบปาร์ตี้ได้",
-        "NOT_PARTY_LEADER",
-        { partyId, actorId: interaction.user.id }
-      )
-    }
-
-    await interaction.editReply({
-      content: `กำลังเสร็จสิ้นปาร์ตี้ #${partyId} กรุณารอสักครู่...`,
-      components: buildPartyFinishSuggestionRows(partyId, { disabled: true })
-    })
-
-    const guild = interaction.client.guilds.cache.get(party.guild_id)
-      || await interaction.client.guilds.fetch(party.guild_id).catch(() => null)
-
-    if (!guild) {
-      throw new ServiceError(
-        "ไม่พบกิลด์ของปาร์ตี้นี้ในตอนนี้",
-        "GUILD_NOT_FOUND",
-        { partyId, guildId: party.guild_id }
-      )
-    }
-
-    const result = await finishParty({
-      guild,
-      partyId,
-      actorId: interaction.user.id,
-      reason: "จบปาร์ตี้จากข้อความแนะนำหลังสมาชิกกดยืนยันยอดครบ"
-    })
-
-    await refreshPartyRecruitmentMessage(interaction.client, partyId)
-
-    const deletedBits = []
-    if (result.removedRole) {
-      deletedBits.push("ลบยศแล้ว")
-    }
-    if (result.removedChannel) {
-      deletedBits.push("ลบห้องแล้ว")
-    }
-
-    await interaction.editReply({
-      content: `ปาร์ตี้ #${partyId} จบแล้ว${deletedBits.length ? ` (${deletedBits.join(", ")})` : ""}`,
-      components: []
-    })
-
-    return true
-  }
-
-  if (action === "finish_abort") {
-    const partyId = Number(parts[0])
-    const party = await partyService.getPartyById(partyId)
-
-    if (party.leader_id !== interaction.user.id) {
-      throw new ServiceError(
-        "หัวหน้าปาร์ตี้เท่านั้นที่จัดการข้อความนี้ได้",
-        "NOT_PARTY_LEADER",
-        { partyId, actorId: interaction.user.id }
-      )
-    }
-
-    await interaction.update({
-      content: `เก็บปาร์ตี้ #${partyId} ไว้ก่อน ตอนพร้อมค่อยใช้ /party finish ได้เสมอ`,
       components: []
     })
 

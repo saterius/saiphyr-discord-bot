@@ -335,23 +335,6 @@ function buildPartyCancelConfirmRows(partyId) {
   ]
 }
 
-function buildPartyFinishSuggestionRows(partyId, { disabled = false } = {}) {
-  return [
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`party:finish_now:${partyId}`)
-        .setLabel("เสร็จสิ้น")
-        .setStyle(ButtonStyle.Danger)
-        .setDisabled(disabled),
-      new ButtonBuilder()
-        .setCustomId(`party:finish_abort:${partyId}`)
-        .setLabel("ไว้ทีหลัง")
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(disabled)
-    )
-  ]
-}
-
 function buildScheduleEmbed(event, party) {
   const acceptedMentions = event.votes
     .filter((vote) => vote.vote === SCHEDULE_VOTE.ACCEPT)
@@ -585,7 +568,6 @@ module.exports = {
   buildPartyActivationNotice,
   buildPartyConfirmationNotice,
   buildPartyEmbed,
-  buildPartyFinishSuggestionRows,
   buildPartyPlannedTimeNotice,
   buildScheduleActionRows,
   buildScheduleBoardOverviewEmbeds,

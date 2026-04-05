@@ -82,6 +82,20 @@ async function getPartyFinderConfig(guildId) {
   )
 }
 
+async function getCalChannelConfig(guildId) {
+  requireValue(guildId, "guildId is required.")
+
+  return getOne(
+    db,
+    `
+      SELECT *
+      FROM guild_party_cal_configs
+      WHERE guild_id = ?
+    `,
+    [guildId]
+  )
+}
+
 async function setVoiceLobby({
   guildId,
   lobbyChannelId
@@ -244,6 +258,39 @@ async function setPartyFinderChannel({
   })
 }
 
+async function setCalChannel({
+  guildId,
+  calChannelId
+}) {
+  requireValue(guildId, "guildId is required.")
+  requireValue(calChannelId, "calChannelId is required.")
+
+  return withTransaction("write", async (tx) => {
+    await run(
+      tx,
+      `
+        INSERT INTO guild_party_cal_configs (guild_id, cal_channel_id)
+        VALUES (?, ?)
+        ON CONFLICT (guild_id)
+        DO UPDATE SET
+          cal_channel_id = excluded.cal_channel_id,
+          updated_at = CURRENT_TIMESTAMP
+      `,
+      [guildId, calChannelId]
+    )
+
+    return getOne(
+      tx,
+      `
+        SELECT *
+        FROM guild_party_cal_configs
+        WHERE guild_id = ?
+      `,
+      [guildId]
+    )
+  })
+}
+
 async function setScheduleBoardMessage({
   guildId,
   boardMessageId
@@ -280,11 +327,13 @@ async function setScheduleBoardMessage({
 module.exports = {
   clearScheduleBoard,
   clearVoiceLobby,
+  getCalChannelConfig,
   getPartyChannelConfig,
   getPartyFinderConfig,
   getScheduleBoardState,
   getScheduleConfig,
   getVoiceConfig,
+  setCalChannel,
   setPartyChannelCategory,
   setPartyFinderChannel,
   setScheduleBoardMessage,
