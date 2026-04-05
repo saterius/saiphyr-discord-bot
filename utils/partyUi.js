@@ -141,7 +141,7 @@ function scheduleStatusLabel(status) {
     [SCHEDULE_STATUS.VOTING]: "กำลังโหวต",
     [SCHEDULE_STATUS.LOCKED]: "ล็อกแล้ว",
     [SCHEDULE_STATUS.CANCELLED]: "ยกเลิกแล้ว",
-    [SCHEDULE_STATUS.EXPIRED]: "หมดเวลา"
+    [SCHEDULE_STATUS.EXPIRED]: "เสร็จสิ้นแล้ว"
   }
 
   return labels[status] || status
@@ -502,6 +502,7 @@ function buildScheduleActionRows(event) {
   const voteDisabled = event.status !== SCHEDULE_STATUS.VOTING
   const lockDisabled = event.status !== SCHEDULE_STATUS.VOTING
   const cancelDisabled = [SCHEDULE_STATUS.CANCELLED, SCHEDULE_STATUS.EXPIRED].includes(event.status)
+  const completeDisabled = event.status !== SCHEDULE_STATUS.LOCKED
 
   return [
     new ActionRowBuilder().addComponents(
@@ -525,6 +526,13 @@ function buildScheduleActionRows(event) {
         .setLabel("ยกเลิกตาราง")
         .setStyle(ButtonStyle.Secondary)
         .setDisabled(cancelDisabled)
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`schedule:complete:${event.id}`)
+        .setLabel("เสร็จสิ้นตาราง")
+        .setStyle(ButtonStyle.Success)
+        .setDisabled(completeDisabled)
     )
   ]
 }
@@ -536,6 +544,11 @@ function buildScheduleCompletionPromptRows(eventId, { disabled = false } = {}) {
         .setCustomId(`schedule:complete:${eventId}`)
         .setLabel("เสร็จสิ้นตาราง")
         .setStyle(ButtonStyle.Success)
+        .setDisabled(disabled),
+      new ButtonBuilder()
+        .setCustomId(`schedule:cancel:${eventId}`)
+        .setLabel("ยกเลิกตาราง")
+        .setStyle(ButtonStyle.Danger)
         .setDisabled(disabled)
     )
   ]
