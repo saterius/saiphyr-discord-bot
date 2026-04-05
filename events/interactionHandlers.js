@@ -534,6 +534,7 @@ async function handlePartyClassSelect(interaction) {
 async function handleScheduleButton(interaction) {
   const [, action, eventIdValue, vote] = interaction.customId.split(":")
   const eventId = Number(eventIdValue)
+  const isPromptMessage = !interaction.message?.embeds?.length
 
   if (action === "complete") {
     await interaction.deferReply({
@@ -553,13 +554,15 @@ async function handleScheduleButton(interaction) {
     await scheduleService.completeScheduleEvent({
       eventId,
       actorId: interaction.user.id,
-      reason: "เสร็จสิ้นจากปุ่มแจ้งเตือนหลังเลยเวลานัด"
+      reason: isPromptMessage
+        ? "เสร็จสิ้นจากปุ่มแจ้งเตือนหลังเลยเวลานัด"
+        : "เสร็จสิ้นจากปุ่มบนโพสต์ตารางนัด"
     })
 
     await refreshScheduleVoteMessage(interaction.client, eventId)
     await syncGuildScheduleBoard(interaction.client, event.guild_id)
 
-    if (interaction.message?.editable) {
+    if (isPromptMessage && interaction.message?.editable) {
       await interaction.message.edit({
         content: `ตารางนัดเวลา #${eventId} ถูกเสร็จสิ้นแล้ว`,
         components: []
@@ -580,22 +583,23 @@ async function handleScheduleButton(interaction) {
 
     const event = await scheduleService.getScheduleEventById(eventId)
 
-    if (event.creator_id !== interaction.user.id) {
-      throw new ServiceError(
-        "เฉพาะคนที่สร้างตารางนัดนี้เท่านั้นที่ยกเลิกได้",
-        "NOT_SCHEDULE_CREATOR",
-        { eventId, actorId: interaction.user.id }
-      )
-    }
-
     await scheduleService.cancelScheduleEvent({
       eventId,
       actorId: interaction.user.id,
-      reason: "ยกเลิกจากปุ่มบนโพสต์ตารางนัด"
+      reason: isPromptMessage
+        ? "ยกเลิกจากปุ่มแจ้งเตือนหลังเลยเวลานัด"
+        : "ยกเลิกจากปุ่มบนโพสต์ตารางนัด"
     })
 
     await refreshScheduleVoteMessage(interaction.client, eventId)
     await syncGuildScheduleBoard(interaction.client, event.guild_id)
+
+    if (isPromptMessage && interaction.message?.editable) {
+      await interaction.message.edit({
+        content: `ตารางนัดเวลา #${eventId} ถูกยกเลิกแล้ว`,
+        components: []
+      }).catch(() => null)
+    }
 
     await interaction.editReply({
       content: `ยกเลิกตารางนัดเวลา #${eventId} เรียบร้อยแล้ว`
