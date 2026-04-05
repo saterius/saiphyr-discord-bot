@@ -350,6 +350,29 @@ async function getVotingScheduleEventForParty(partyId) {
   return loadScheduleEventDetails(db, event.id)
 }
 
+async function getLockedScheduleEventForParty(partyId) {
+  requireValue(partyId, "partyId is required.")
+
+  const event = await getOne(
+    db,
+    `
+      SELECT id
+      FROM schedule_events
+      WHERE party_id = ?
+        AND status = ?
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
+    `,
+    [partyId, SCHEDULE_STATUS.LOCKED]
+  )
+
+  if (!event) {
+    return null
+  }
+
+  return loadScheduleEventDetails(db, event.id)
+}
+
 async function getCancelableScheduleEventForParty(partyId) {
   requireValue(partyId, "partyId is required.")
 
@@ -671,7 +694,8 @@ async function lockScheduleEvent({
 async function completeScheduleEvent({
   eventId,
   actorId,
-  reason = "Completed manually."
+  reason = "Completed manually.",
+  allowNonLeader = false
 }) {
   requireValue(eventId, "eventId is required.")
   requireValue(actorId, "actorId is required.")
@@ -680,7 +704,7 @@ async function completeScheduleEvent({
     const event = await getScheduleEventRecord(tx, eventId)
     const party = await getPartyForScheduling(tx, event.party_id)
 
-    if (party.leader_id !== actorId) {
+    if (!allowNonLeader && party.leader_id !== actorId) {
       throw new ServiceError(
         "Only the party leader can complete a schedule event.",
         "NOT_PARTY_LEADER",
@@ -969,6 +993,7 @@ module.exports = {
   completeScheduleEvent,
   createScheduleEvent,
   getCancelableScheduleEventForParty,
+  getLockedScheduleEventForParty,
   getScheduleEventById,
   getLatestScheduleEventForParty,
   getVotingScheduleEventForParty,
