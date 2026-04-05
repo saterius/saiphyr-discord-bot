@@ -336,22 +336,31 @@ function buildPartyCancelConfirmRows(partyId) {
 }
 
 function buildScheduleEmbed(event, party) {
+  const memberByUserId = new Map(
+    (party?.members || []).map((member) => [member.user_id, member])
+  )
+  const renderScheduleMember = (userId) => {
+    const member = memberByUserId.get(userId)
+    const job = member?.class_label || getClassOption(member?.class_key)?.label || member?.class_key
+    return job ? `<@${userId}> | ${job}` : `<@${userId}>`
+  }
+
   const acceptedMentions = event.votes
     .filter((vote) => vote.vote === SCHEDULE_VOTE.ACCEPT)
-    .map((vote) => `<@${vote.user_id}>`)
-    .join(", ") || "-"
+    .map((vote) => renderScheduleMember(vote.user_id))
+    .join("\n") || "-"
 
   const deniedMentions = event.votes
     .filter((vote) => vote.vote === SCHEDULE_VOTE.DENY)
-    .map((vote) => `<@${vote.user_id}>`)
-    .join(", ") || "-"
+    .map((vote) => renderScheduleMember(vote.user_id))
+    .join("\n") || "-"
 
   const votedUserIds = new Set(event.votes.map((vote) => vote.user_id))
   const pendingMentions = (party?.members || [])
     .filter((member) => ["joined", "confirmed"].includes(member.join_status))
     .filter((member) => !votedUserIds.has(member.user_id))
-    .map((member) => `<@${member.user_id}>`)
-    .join(", ") || "-"
+    .map((member) => renderScheduleMember(member.user_id))
+    .join("\n") || "-"
 
   return new EmbedBuilder()
     .setTitle("Schedule Vote")
