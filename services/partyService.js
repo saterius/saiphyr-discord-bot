@@ -290,6 +290,7 @@ async function createParty({
   description = null,
   partyType = PARTY_TYPE.AD_HOC,
   plannedStartAtUnix = null,
+  plannedEndAtUnix = null,
   plannedTimezone = null,
   recruitChannelId = null,
   recruitMessageId = null,
@@ -321,11 +322,12 @@ async function createParty({
           description,
           party_type,
           planned_start_at_unix,
+          planned_end_at_unix,
           planned_timezone,
           max_members,
           auto_close_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         guildId,
@@ -336,6 +338,7 @@ async function createParty({
         description,
         partyType,
         plannedStartAtUnix,
+        plannedEndAtUnix,
         plannedTimezone,
         maxMembers,
         autoCloseAt
@@ -348,7 +351,7 @@ async function createParty({
       partyId,
       actorId: leaderId,
       action: "party_created",
-      meta: { name, maxMembers, partyType, plannedStartAtUnix, plannedTimezone }
+      meta: { name, maxMembers, partyType, plannedStartAtUnix, plannedEndAtUnix, plannedTimezone }
     })
 
     return loadPartyDetails(tx, partyId)
@@ -363,6 +366,7 @@ async function importParty({
   description = null,
   partyType = PARTY_TYPE.AD_HOC,
   plannedStartAtUnix = null,
+  plannedEndAtUnix = null,
   plannedTimezone = null,
   partyRoleId,
   partyChannelId,
@@ -441,12 +445,13 @@ async function importParty({
           description,
           party_type,
           planned_start_at_unix,
+          planned_end_at_unix,
           planned_timezone,
           max_members,
           status,
           locked_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         guildId,
@@ -457,6 +462,7 @@ async function importParty({
         description,
         partyType,
         plannedStartAtUnix,
+        plannedEndAtUnix,
         plannedTimezone,
         maxMembers,
         PARTY_STATUS.ACTIVE,

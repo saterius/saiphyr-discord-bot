@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS parties (
     party_type IN ('static', 'ad_hoc')
   ),
   planned_start_at_unix INTEGER,
+  planned_end_at_unix INTEGER,
   planned_timezone TEXT,
   max_members INTEGER NOT NULL DEFAULT 8 CHECK (max_members > 0),
   status TEXT NOT NULL DEFAULT 'recruiting' CHECK (

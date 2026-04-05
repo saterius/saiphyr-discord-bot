@@ -60,6 +60,15 @@ async function applySchemaFile(file) {
     }
   }
 
+  if (file.name === "13_party_planned_end_time_migration.sql") {
+    const hasPlannedEnd = await columnExists("parties", "planned_end_at_unix")
+
+    if (hasPlannedEnd) {
+      console.log(`Skipping ${file.name} (planned_end_at_unix already exists).`)
+      return
+    }
+  }
+
   console.log(`Applying ${file.name}...`)
   await db.executeMultiple(file.sql)
 }

@@ -28,6 +28,7 @@ const {
   buildPartyEmbed,
   buildClassSelectRow
 } = require("../utils/partyUi")
+const { parseBangkokDateTimeRange } = require("../utils/dateTimeRange")
 
 function formatPartyType(type) {
   return type === PARTY_TYPE.STATIC ? "ประจำ" : "เฉพาะกิจ"
@@ -61,27 +62,6 @@ function formatGold(value) {
   return `${formatted}G`
 }
 
-function buildBangkokUnixTimestamp(year, month, day, hour, minute) {
-  const utcMillis = Date.UTC(year, month - 1, day, hour - 7, minute, 0, 0)
-  const bangkokDate = new Date(utcMillis + (7 * 60 * 60 * 1000))
-
-  if (
-    bangkokDate.getUTCFullYear() !== year ||
-    bangkokDate.getUTCMonth() !== month - 1 ||
-    bangkokDate.getUTCDate() !== day ||
-    bangkokDate.getUTCHours() !== hour ||
-    bangkokDate.getUTCMinutes() !== minute
-  ) {
-    throw new ServiceError(
-      "วันหรือเวลาไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง",
-      "INVALID_PARTY_DATETIME",
-      { year, month, day, hour, minute }
-    )
-  }
-
-  return Math.floor(utcMillis / 1000)
-}
-
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("party")
@@ -111,40 +91,10 @@ module.exports = {
             .setName("description")
             .setDescription("คำอธิบายปาร์ตี้")
         )
-        .addIntegerOption((option) =>
+        .addStringOption((option) =>
           option
-            .setName("year")
-            .setDescription("ปีสำหรับปาร์ตี้เฉพาะกิจ")
-            .setMinValue(2025)
-            .setMaxValue(2100)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("month")
-            .setDescription("เดือนสำหรับปาร์ตี้เฉพาะกิจ")
-            .setMinValue(1)
-            .setMaxValue(12)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("day")
-            .setDescription("วันที่สำหรับปาร์ตี้เฉพาะกิจ")
-            .setMinValue(1)
-            .setMaxValue(31)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("hour")
-            .setDescription("ชั่วโมงสำหรับปาร์ตี้เฉพาะกิจ")
-            .setMinValue(0)
-            .setMaxValue(23)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("minute")
-            .setDescription("นาทีสำหรับปาร์ตี้เฉพาะกิจ")
-            .setMinValue(0)
-            .setMaxValue(59)
+            .setName("datetime_range")
+            .setDescription("สำหรับตี้เฉพาะกิจ ใช้รูปแบบ DD-MM-YYYY hh:mm-hh:mm")
         )
         .addIntegerOption((option) =>
           option
@@ -198,40 +148,10 @@ module.exports = {
             .setName("description")
             .setDescription("คำอธิบายปาร์ตี้")
         )
-        .addIntegerOption((option) =>
+        .addStringOption((option) =>
           option
-            .setName("year")
-            .setDescription("ปีสำหรับปาร์ตี้เฉพาะกิจ")
-            .setMinValue(2025)
-            .setMaxValue(2100)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("month")
-            .setDescription("เดือนสำหรับปาร์ตี้เฉพาะกิจ")
-            .setMinValue(1)
-            .setMaxValue(12)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("day")
-            .setDescription("วันที่สำหรับปาร์ตี้เฉพาะกิจ")
-            .setMinValue(1)
-            .setMaxValue(31)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("hour")
-            .setDescription("ชั่วโมงสำหรับปาร์ตี้เฉพาะกิจ")
-            .setMinValue(0)
-            .setMaxValue(23)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("minute")
-            .setDescription("นาทีสำหรับปาร์ตี้เฉพาะกิจ")
-            .setMinValue(0)
-            .setMaxValue(59)
+            .setName("datetime_range")
+            .setDescription("สำหรับตี้เฉพาะกิจ ใช้รูปแบบ DD-MM-YYYY hh:mm-hh:mm")
         )
         .addIntegerOption((option) =>
           option
@@ -406,11 +326,7 @@ module.exports = {
       const name = interaction.options.getString("party_name")
       const description = interaction.options.getString("description")
       const partyType = interaction.options.getString("type")
-      const year = interaction.options.getInteger("year")
-      const month = interaction.options.getInteger("month")
-      const day = interaction.options.getInteger("day")
-      const hour = interaction.options.getInteger("hour")
-      const minute = interaction.options.getInteger("minute")
+      const dateTimeRangeInput = interaction.options.getString("datetime_range")
       const maxMembers = interaction.options.getInteger("max_members") || 8
       const partyChannelConfig = await getPartyChannelConfig(interaction.guildId)
       const partyFinderConfig = await getPartyFinderConfig(interaction.guildId)
@@ -443,26 +359,18 @@ module.exports = {
         )
       }
 
-      const hasFullPlannedTime = [year, month, day, hour, minute].every((value) => value !== null)
-      const hasAnyPlannedTime = [year, month, day, hour, minute].some((value) => value !== null)
+      const parsedRange = parseBangkokDateTimeRange(dateTimeRangeInput, {
+        required: partyType === PARTY_TYPE.AD_HOC,
+        errorCode: "INVALID_PARTY_DATETIME",
+        label: "ช่วงเวลาปาร์ตี้ "
+      })
 
-      if (partyType === PARTY_TYPE.AD_HOC && !hasFullPlannedTime) {
+      if (partyType === PARTY_TYPE.AD_HOC && !parsedRange) {
         throw new ServiceError(
-          "ปาร์ตี้ประเภทเฉพาะกิจต้องระบุ ปี เดือน วัน ชั่วโมง และนาที ตอนสร้างปาร์ตี้ด้วย",
+          "ปาร์ตี้ประเภทเฉพาะกิจต้องระบุช่วงเวลานัดในรูปแบบ DD-MM-YYYY hh:mm-hh:mm",
           "AD_HOC_TIME_REQUIRED"
         )
       }
-
-      if (hasAnyPlannedTime && !hasFullPlannedTime) {
-        throw new ServiceError(
-          "ถ้าจะใส่เวลานัด กรุณาใส่ ปี เดือน วัน ชั่วโมง และนาที ให้ครบ",
-          "INCOMPLETE_PARTY_TIME"
-        )
-      }
-
-      const plannedStartAtUnix = hasFullPlannedTime
-        ? buildBangkokUnixTimestamp(year, month, day, hour, minute)
-        : null
 
       await interaction.deferReply({ flags: MessageFlags.Ephemeral })
 
@@ -472,8 +380,9 @@ module.exports = {
         name,
         description,
         partyType,
-        plannedStartAtUnix,
-        plannedTimezone: plannedStartAtUnix ? "Asia/Bangkok" : null,
+        plannedStartAtUnix: parsedRange?.startAtUnix || null,
+        plannedEndAtUnix: parsedRange?.endAtUnix || null,
+        plannedTimezone: parsedRange?.timezone || null,
         recruitChannelId: interaction.channelId,
         maxMembers
       })
@@ -500,11 +409,7 @@ module.exports = {
       const leader = interaction.options.getUser("leader")
       const role = interaction.options.getRole("role")
       const channel = interaction.options.getChannel("channel")
-      const year = interaction.options.getInteger("year")
-      const month = interaction.options.getInteger("month")
-      const day = interaction.options.getInteger("day")
-      const hour = interaction.options.getInteger("hour")
-      const minute = interaction.options.getInteger("minute")
+      const dateTimeRangeInput = interaction.options.getString("datetime_range")
       const maxMembers = interaction.options.getInteger("max_members") || 8
       const selectedMembers = [
         interaction.options.getUser("member_1"),
@@ -517,26 +422,18 @@ module.exports = {
         interaction.options.getUser("member_8")
       ].filter(Boolean)
 
-      const hasFullPlannedTime = [year, month, day, hour, minute].every((value) => value !== null)
-      const hasAnyPlannedTime = [year, month, day, hour, minute].some((value) => value !== null)
+      const parsedRange = parseBangkokDateTimeRange(dateTimeRangeInput, {
+        required: partyType === PARTY_TYPE.AD_HOC,
+        errorCode: "INVALID_PARTY_DATETIME",
+        label: "ช่วงเวลาปาร์ตี้ "
+      })
 
-      if (partyType === PARTY_TYPE.AD_HOC && !hasFullPlannedTime) {
+      if (partyType === PARTY_TYPE.AD_HOC && !parsedRange) {
         throw new ServiceError(
-          "ปาร์ตี้เฉพาะกิจต้องระบุ ปี เดือน วัน ชั่วโมง และนาที ให้ครบก่อนนำเข้าปาร์ตี้",
+          "ปาร์ตี้เฉพาะกิจต้องระบุช่วงเวลานัดในรูปแบบ DD-MM-YYYY hh:mm-hh:mm",
           "AD_HOC_TIME_REQUIRED"
         )
       }
-
-      if (hasAnyPlannedTime && !hasFullPlannedTime) {
-        throw new ServiceError(
-          "ถ้าจะใส่เวลานัด กรุณาใส่ ปี เดือน วัน ชั่วโมง และนาที ให้ครบ",
-          "INCOMPLETE_PARTY_TIME"
-        )
-      }
-
-      const plannedStartAtUnix = hasFullPlannedTime
-        ? buildBangkokUnixTimestamp(year, month, day, hour, minute)
-        : null
 
       await interaction.deferReply({ flags: MessageFlags.Ephemeral })
       const manualMemberIds = selectedMembers.map((member) => member.id)
@@ -548,8 +445,9 @@ module.exports = {
         name,
         description,
         partyType,
-        plannedStartAtUnix,
-        plannedTimezone: plannedStartAtUnix ? "Asia/Bangkok" : null,
+        plannedStartAtUnix: parsedRange?.startAtUnix || null,
+        plannedEndAtUnix: parsedRange?.endAtUnix || null,
+        plannedTimezone: parsedRange?.timezone || null,
         partyRoleId: role.id,
         partyChannelId: channel.id,
         memberIds: manualMemberIds,
