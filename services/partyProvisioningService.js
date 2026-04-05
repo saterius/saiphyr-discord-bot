@@ -9,11 +9,15 @@ const partyService = require("./partyService")
 const { getPartyChannelConfig } = require("./guildConfigService")
 
 function defaultRoleName(party) {
-  return `Party - ${party.name}`
+  return String(party.name || "").trim() || `party-${party.id}`
 }
 
 function defaultChannelName(party) {
-  return `party-${String(party.name).trim().toLowerCase().replace(/\s+/g, "-")}`
+  return String(party.name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    || `party-${party.id}`
 }
 
 async function resolveRole(guild, party, roleName) {
