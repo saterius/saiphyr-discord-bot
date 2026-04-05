@@ -94,7 +94,7 @@ module.exports = {
         .addStringOption((option) =>
           option
             .setName("datetime_range")
-            .setDescription("สำหรับตี้เฉพาะกิจ ใช้รูปแบบ DD-MM-YYYY hh:mm-hh:mm")
+            .setDescription("รูปแบบ DD-MM-YYYY hh:mm-hh:mm เช่น 25-04-2026 21:30-22:30")
         )
         .addIntegerOption((option) =>
           option
@@ -151,7 +151,7 @@ module.exports = {
         .addStringOption((option) =>
           option
             .setName("datetime_range")
-            .setDescription("สำหรับตี้เฉพาะกิจ ใช้รูปแบบ DD-MM-YYYY hh:mm-hh:mm")
+            .setDescription("รูปแบบ DD-MM-YYYY hh:mm-hh:mm เช่น 25-04-2026 21:30-22:30")
         )
         .addIntegerOption((option) =>
           option
