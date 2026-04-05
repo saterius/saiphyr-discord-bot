@@ -1,6 +1,17 @@
 const fs = require("node:fs")
 const path = require("node:path")
 
+const FONTCONFIG_DIR = path.join(__dirname, "..", "assets", "fontconfig")
+const FONTCONFIG_FILE = path.join(FONTCONFIG_DIR, "fonts.conf")
+
+if (!process.env.FONTCONFIG_PATH && fs.existsSync(FONTCONFIG_DIR)) {
+  process.env.FONTCONFIG_PATH = FONTCONFIG_DIR
+}
+
+if (!process.env.FONTCONFIG_FILE && fs.existsSync(FONTCONFIG_FILE)) {
+  process.env.FONTCONFIG_FILE = FONTCONFIG_FILE
+}
+
 const sharp = require("sharp")
 
 const CELL_HEIGHT = 86
