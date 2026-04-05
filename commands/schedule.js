@@ -15,6 +15,7 @@ const {
   buildScheduleActionRows,
   buildScheduleEmbed
 } = require("../utils/partyUi")
+const { parseBangkokDateTimeRange } = require("../utils/dateTimeRange")
 
 function ensurePartyChannel(interaction, party) {
   if (!party) {
@@ -32,31 +33,6 @@ async function resolvePartyFromChannel(interaction) {
   return party
 }
 
-function buildBangkokUnixTimestamp(year, month, day, hour, minute) {
-  const utcMillis = Date.UTC(year, month - 1, day, hour - 7, minute, 0, 0)
-  const bangkokDate = new Date(utcMillis + (7 * 60 * 60 * 1000))
-
-  if (
-    bangkokDate.getUTCFullYear() !== year ||
-    bangkokDate.getUTCMonth() !== month - 1 ||
-    bangkokDate.getUTCDate() !== day ||
-    bangkokDate.getUTCHours() !== hour ||
-    bangkokDate.getUTCMinutes() !== minute
-  ) {
-    throw new ServiceError(
-      "รูปแบบของวันที่หรือเวลาไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง",
-      "INVALID_SCHEDULE_DATETIME",
-      { year, month, day, hour, minute }
-    )
-  }
-
-  return Math.floor(utcMillis / 1000)
-}
-
-function formatBangkokDateText(year, month, day, hour, minute) {
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")} ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")} (Asia/Bangkok)`
-}
-
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("schedule")
@@ -65,44 +41,10 @@ module.exports = {
       subcommand
         .setName("create")
         .setDescription("สร้างโหวตตารางเวลาสำหรับปาร์ตี้")
-        .addIntegerOption((option) =>
+        .addStringOption((option) =>
           option
-            .setName("year")
-            .setDescription("ปี (ค.ศ.)")
-            .setMinValue(2025)
-            .setMaxValue(2100)
-            .setRequired(true)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("month")
-            .setDescription("เดือน")
-            .setMinValue(1)
-            .setMaxValue(12)
-            .setRequired(true)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("day")
-            .setDescription("วันที่")
-            .setMinValue(1)
-            .setMaxValue(31)
-            .setRequired(true)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("hour")
-            .setDescription("ชั่วโมง")
-            .setMinValue(0)
-            .setMaxValue(23)
-            .setRequired(true)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("minute")
-            .setDescription("นาที")
-            .setMinValue(0)
-            .setMaxValue(59)
+            .setName("datetime_range")
+            .setDescription("รูปแบบ DD-MM-YYYY hh:mm-hh:mm เช่น 25-04-2026 21:30-22:30")
             .setRequired(true)
         )
         .addStringOption((option) =>
@@ -143,11 +85,7 @@ module.exports = {
     if (subcommand === "create") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral })
 
-      const year = interaction.options.getInteger("year")
-      const month = interaction.options.getInteger("month")
-      const day = interaction.options.getInteger("day")
-      const hour = interaction.options.getInteger("hour")
-      const minute = interaction.options.getInteger("minute")
+      const dateTimeRangeInput = interaction.options.getString("datetime_range")
       const description = interaction.options.getString("description")
       const party = await resolvePartyFromChannel(interaction)
       const scheduleConfig = await getScheduleConfig(interaction.guildId)
@@ -161,18 +99,22 @@ module.exports = {
       }
 
       const resolvedBoardChannelId = scheduleConfig.board_channel_id
-      const startAtUnix = buildBangkokUnixTimestamp(year, month, day, hour, minute)
-      const proposedStartAt = formatBangkokDateText(year, month, day, hour, minute)
+      const parsedRange = parseBangkokDateTimeRange(dateTimeRangeInput, {
+        required: true,
+        errorCode: "INVALID_SCHEDULE_DATETIME",
+        label: "ช่วงเวลานัด "
+      })
 
       const event = await scheduleService.createScheduleEvent({
         partyId: party.id,
         creatorId: interaction.user.id,
         title: party.name,
         description,
-        proposedStartAt,
-        proposedEndAt: null,
-        startAtUnix,
-        endAtUnix: null,
+        proposedStartAt: parsedRange.proposedStartAt,
+        proposedEndAt: parsedRange.proposedEndAt,
+        startAtUnix: parsedRange.startAtUnix,
+        endAtUnix: parsedRange.endAtUnix,
+        timezone: parsedRange.timezone,
         sourceChannelId: interaction.channelId,
         boardChannelId: resolvedBoardChannelId
       })

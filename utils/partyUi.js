@@ -44,7 +44,17 @@ function renderScheduleWindow(event) {
   if (event.start_at_unix) {
     const startFull = renderDiscordTimestamp(event.start_at_unix, "F")
     const startRelative = renderDiscordTimestamp(event.start_at_unix, "R")
-    return `${startFull} (${startRelative})`
+    const endShort = event.end_at_unix
+      ? renderDiscordTimestamp(event.end_at_unix, "t")
+      : null
+
+    return endShort
+      ? `${startFull} - ${endShort} (${startRelative})`
+      : `${startFull} (${startRelative})`
+  }
+
+  if (event.proposed_start_at && event.proposed_end_at) {
+    return `${event.proposed_start_at} - ${event.proposed_end_at}`
   }
 
   return event.proposed_start_at || "-"
@@ -55,7 +65,14 @@ function renderPartyPlannedTime(party) {
     return "-"
   }
 
-  return `${renderDiscordTimestamp(party.planned_start_at_unix, "F")} (${renderDiscordTimestamp(party.planned_start_at_unix, "R")})`
+  const startFull = renderDiscordTimestamp(party.planned_start_at_unix, "F")
+  const endShort = party.planned_end_at_unix
+    ? renderDiscordTimestamp(party.planned_end_at_unix, "t")
+    : null
+
+  return endShort
+    ? `${startFull} - ${endShort} (${renderDiscordTimestamp(party.planned_start_at_unix, "R")})`
+    : `${startFull} (${renderDiscordTimestamp(party.planned_start_at_unix, "R")})`
 }
 
 function partyStatusLabel(status) {

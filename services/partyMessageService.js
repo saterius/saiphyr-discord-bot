@@ -1,3 +1,7 @@
+const {
+  AttachmentBuilder
+} = require("discord.js")
+
 const partyService = require("./partyService")
 const scheduleService = require("./scheduleService")
 const { provisionPartyResources } = require("./partyProvisioningService")
@@ -20,6 +24,7 @@ const {
   buildScheduleEmbed,
   buildScheduleLockedNotice
 } = require("../utils/partyUi")
+const { createScheduleBoardImage } = require("../utils/scheduleBoardImage")
 
 async function fetchTextChannel(client, channelId, fallbackChannel = null) {
   if (!channelId) {
@@ -158,11 +163,21 @@ async function syncGuildScheduleBoard(client, guildId, explicitBoardChannelId = 
 
   const entries = await scheduleService.listGuildLockedScheduleEntries(guildId)
   const embeds = buildScheduleBoardOverviewEmbeds(entries, guildId)
+  const boardImage = await createScheduleBoardImage(entries)
+  const files = boardImage
+    ? [new AttachmentBuilder(boardImage.buffer, { name: boardImage.name })]
+    : []
+
+  if (boardImage && embeds.length) {
+    embeds[0].setImage(`attachment://${boardImage.name}`)
+  }
+
   const boardState = await getScheduleBoardState(guildId)
 
   if (!boardState?.board_message_id) {
     const message = await channel.send({
-      embeds
+      embeds,
+      files
     })
 
     await setScheduleBoardMessage({
@@ -177,7 +192,8 @@ async function syncGuildScheduleBoard(client, guildId, explicitBoardChannelId = 
 
   if (!message) {
     const replacement = await channel.send({
-      embeds
+      embeds,
+      files
     })
 
     await setScheduleBoardMessage({
@@ -189,7 +205,9 @@ async function syncGuildScheduleBoard(client, guildId, explicitBoardChannelId = 
   }
 
   await message.edit({
-    embeds
+    embeds,
+    files,
+    attachments: []
   })
 
   return message
