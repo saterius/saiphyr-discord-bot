@@ -28,5 +28,5 @@ module.exports = [
   { key: "darksummoner", label: "Dark Summoner" },
   { key: "souleater", label: "Soul Eater" },
   { key: "bladedancer", label: "Blade Dancer" },
-  { key: "spiritdancer", label: "SpiritDancer" }
+  { key: "spiritdancer", label: "Spirit Dancer" }
 ]
