@@ -3,9 +3,9 @@ const path = require("node:path")
 
 const sharp = require("sharp")
 
-const CELL_HEIGHT = 74
-const DAY_WIDTH = 360
-const TIME_WIDTH = 166
+const CELL_HEIGHT = 86
+const DAY_WIDTH = 420
+const TIME_WIDTH = 176
 const HEADER_HEIGHT = 80
 const WEEK_LABEL_HEIGHT = 68
 const PADDING = 28
@@ -57,11 +57,13 @@ const THAI_MONTH_SHORT = [
 
 const FONT_PATHS = {
   regular: [
+    path.join(__dirname, "..", "assets", "fonts", "LeelawUI.ttf"),
     "C:\\Windows\\Fonts\\LeelawUI.ttf",
     "C:\\Windows\\Fonts\\tahoma.ttf",
     "C:\\Windows\\Fonts\\leelawad.ttf"
   ],
   bold: [
+    path.join(__dirname, "..", "assets", "fonts", "LeelaUIb.ttf"),
     "C:\\Windows\\Fonts\\LeelaUIb.ttf",
     "C:\\Windows\\Fonts\\tahomabd.ttf",
     "C:\\Windows\\Fonts\\leelawdb.ttf"
@@ -217,6 +219,113 @@ function wrapLabel(text, maxCharsPerLine = 22, maxLines = 3) {
   return lines.slice(0, maxLines)
 }
 
+function abbreviateLabel(text, maxLength = 18) {
+  const normalized = sanitizeLabel(text)
+  if (normalized.length <= maxLength) {
+    return normalized
+  }
+
+  const words = normalized.split(" ").filter(Boolean)
+  if (!words.length) {
+    return normalized
+  }
+
+  const trailingNumber = /\d+$/.exec(normalized)?.[0] || ""
+  const acronymParts = words
+    .map((word) => {
+      if (/^\d+$/.test(word)) {
+        return word
+      }
+
+      return word[0]?.toUpperCase() || ""
+    })
+    .filter(Boolean)
+
+  let abbreviated = acronymParts.join("")
+  if (trailingNumber && !abbreviated.endsWith(trailingNumber)) {
+    abbreviated = `${abbreviated} ${trailingNumber}`.trim()
+  }
+
+  if (abbreviated.length <= maxLength) {
+    return abbreviated
+  }
+
+  return normalized.slice(0, Math.max(1, maxLength - 1)).trimEnd() + "…"
+}
+
+function assignDayLanes(entries) {
+  const sortedEntries = [...entries].sort((a, b) => {
+    if (a.normalizedStartMinutes !== b.normalizedStartMinutes) {
+      return a.normalizedStartMinutes - b.normalizedStartMinutes
+    }
+
+    return a.normalizedEndMinutes - b.normalizedEndMinutes
+  })
+
+  const laneAssignments = new Map()
+  let active = []
+  let clusterEntries = []
+  let nextLaneIndex = 0
+  let clusterMaxLanes = 0
+  let availableLaneIndexes = []
+
+  function finalizeCluster() {
+    if (!clusterEntries.length) {
+      return
+    }
+
+    for (const entry of clusterEntries) {
+      const assignment = laneAssignments.get(entry)
+      assignment.laneCount = Math.max(1, clusterMaxLanes)
+    }
+
+    clusterEntries = []
+    clusterMaxLanes = 0
+    nextLaneIndex = 0
+    availableLaneIndexes = []
+  }
+
+  for (const entry of sortedEntries) {
+    const stillActive = []
+
+    for (const activeEntry of active) {
+      if (activeEntry.normalizedEndMinutes <= entry.normalizedStartMinutes) {
+        availableLaneIndexes.push(laneAssignments.get(activeEntry).laneIndex)
+      } else {
+        stillActive.push(activeEntry)
+      }
+    }
+
+    availableLaneIndexes.sort((a, b) => a - b)
+    active = stillActive
+
+    if (!active.length) {
+      finalizeCluster()
+    }
+
+    const laneIndex = availableLaneIndexes.length ? availableLaneIndexes.shift() : nextLaneIndex
+    if (laneIndex === nextLaneIndex) {
+      nextLaneIndex += 1
+    }
+
+    laneAssignments.set(entry, {
+      laneIndex,
+      laneCount: 1
+    })
+
+    active.push(entry)
+    clusterEntries.push(entry)
+    clusterMaxLanes = Math.max(clusterMaxLanes, active.length)
+  }
+
+  finalizeCluster()
+
+  return sortedEntries.map((entry) => ({
+    ...entry,
+    ...laneAssignments.get(entry)
+  }))
+}
+
 function buildRollingSection(entries) {
   const rangeStartUnix = startOfWeekSaturday(startOfBangkokDay(Math.floor(Date.now() / 1000)))
   const rangeEndUnix = rangeStartUnix + (7 * DAY_SECONDS)
@@ -249,13 +358,28 @@ function buildRollingSection(entries) {
     }
   })
 
+  const entriesByDay = new Map()
+  for (const entry of normalizedEntries) {
+    const key = String(entry.dayStartUnix)
+    if (!entriesByDay.has(key)) {
+      entriesByDay.set(key, [])
+    }
+
+    entriesByDay.get(key).push(entry)
+  }
+
+  const laidOutEntries = []
+  for (const dayEntries of entriesByDay.values()) {
+    laidOutEntries.push(...assignDayLanes(dayEntries))
+  }
+
   const displayStartMinutes = visibleEntries.length
-    ? Math.floor(Math.min(...normalizedEntries.map((entry) => entry.normalizedStartMinutes)) / 30) * 30
+    ? Math.floor(Math.min(...laidOutEntries.map((entry) => entry.normalizedStartMinutes)) / 30) * 30
     : (18 * 60)
 
   const displayEndMinutes = visibleEntries.length
     ? Math.max(
-      Math.ceil(Math.max(...normalizedEntries.map((entry) => entry.normalizedEndMinutes)) / 30) * 30,
+      Math.ceil(Math.max(...laidOutEntries.map((entry) => entry.normalizedEndMinutes)) / 30) * 30,
       useOvernightTimeline ? (26 * 60) : 0
     )
     : (24 * 60)
@@ -269,7 +393,7 @@ function buildRollingSection(entries) {
   return {
     rangeStartUnix,
     rangeEndUnix,
-    entries: normalizedEntries,
+    entries: laidOutEntries,
     slots,
     displayStartMinutes
   }
@@ -451,12 +575,21 @@ function buildSvg(section) {
 
     const slotOffset = (entry.normalizedStartMinutes - section.displayStartMinutes) / 30
     const slotSpan = Math.max(1, (entry.normalizedEndMinutes - entry.normalizedStartMinutes) / 30)
-    const blockX = gridX + (dayIndex * DAY_WIDTH) + 4
+    const laneGap = 8
+    const laneCount = Math.max(1, entry.laneCount || 1)
+    const usableDayWidth = DAY_WIDTH - 8
+    const laneWidth = (usableDayWidth - ((laneCount - 1) * laneGap)) / laneCount
+    const blockX = gridX + (dayIndex * DAY_WIDTH) + 4 + ((entry.laneIndex || 0) * (laneWidth + laneGap))
     const blockY = gridY + Math.round(slotOffset * CELL_HEIGHT) + 4
-    const blockWidth = DAY_WIDTH - 8
+    const blockWidth = Math.max(96, Math.floor(laneWidth))
     const blockHeight = Math.max(CELL_HEIGHT - 8, Math.round(slotSpan * CELL_HEIGHT) - 8)
-    const labelLines = wrapLabel(entry.party_name || `#${entry.party_id || entry.id}`)
-    const fontSize = labelLines.length >= 3 ? 24 : 28
+    const maxCharsPerLine = Math.max(8, Math.floor((blockWidth - 28) / 12))
+    const rawLabel = entry.party_name || `#${entry.party_id || entry.id}`
+    const compactLabel = laneCount >= 3 || blockWidth < 150
+      ? abbreviateLabel(rawLabel, Math.max(10, maxCharsPerLine * 2))
+      : rawLabel
+    const labelLines = wrapLabel(compactLabel, maxCharsPerLine, 3)
+    const fontSize = blockWidth < 170 ? 20 : labelLines.length >= 3 ? 22 : 28
     const color = index % 2 === 0 ? COLORS.card : COLORS.cardAlt
 
     parts.push(`
@@ -465,7 +598,6 @@ function buildSvg(section) {
         y="${blockY}"
         width="${blockWidth}"
         height="${blockHeight}"
-        rx="18"
         fill="${color}"
         stroke="${COLORS.cardStroke}"
         stroke-width="2"
