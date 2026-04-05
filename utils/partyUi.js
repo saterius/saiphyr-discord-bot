@@ -525,7 +525,7 @@ function buildPartyConfirmationNotice(party) {
     : null
   const jumpLine = jumpUrl ? `\nกดกลับไปที่โพสต์รับคนได้ที่นี่: ${jumpUrl}` : ""
 
-  return `${mentions}\nรบกวนสมาชิกทุกคนกดปุ่ม "ยืนยันปาร์ตี้" ที่โพสต์รับคน เพื่อเริ่มจัดตั้งปาร์ตี้.${jumpLine}`
+  return `${mentions}\nรบกวนสมาชิกทุกคนกดปุ่ม "ยืนยันปาร์ตี้" ที่โพสต์รับคน เพื่อเริ่มจัดตั้งปาร์ตี้. (หรือหัวหน้าปาร์ตี้สามารถกด "เปิดปาร์ตี้ทันที" ได้เลย หากคิดว่าพร้อมแล้ว)${jumpLine}`
 }
 
 function buildPartyActivationNotice(party) {
