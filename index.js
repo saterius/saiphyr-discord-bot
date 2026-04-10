@@ -5,6 +5,7 @@ const { Client, GatewayIntentBits, Partials } = require("discord.js")
 const loadCommands = require("./utils/commandLoader")
 const loadEvents = require("./utils/eventLoader")
 const deployCommands = require("./utils/deployCommands")
+const { startDailyPartyRecruitmentRepostLoop } = require("./services/partyRecruitmentRepostService")
 const { startScheduleReminderLoop } = require("./services/scheduleReminderService")
 
 const client = new Client({
@@ -26,6 +27,7 @@ client.once("ready", async () => {
 
   await deployCommands()
   startScheduleReminderLoop(client)
+  startDailyPartyRecruitmentRepostLoop(client)
 })
 
 client.login(process.env.TOKEN)
