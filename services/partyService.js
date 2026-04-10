@@ -620,6 +620,52 @@ async function listGuildParties(guildId, { statuses = [], includeMembers = false
   }))
 }
 
+async function listRecruitingParties({ includeMembers = false } = {}) {
+  const parties = await getMany(
+    db,
+    `
+      SELECT
+        p.*,
+        COUNT(CASE WHEN pm.join_status IN ('joined', 'confirmed') THEN 1 END) AS active_member_count,
+        COUNT(CASE WHEN pm.join_status = 'confirmed' THEN 1 END) AS confirmed_member_count
+      FROM parties p
+      LEFT JOIN party_members pm ON pm.party_id = p.id
+      WHERE p.status = ?
+        AND p.recruit_channel_id IS NOT NULL
+      GROUP BY p.id
+      ORDER BY p.created_at DESC
+    `,
+    [PARTY_STATUS.RECRUITING]
+  )
+
+  if (!includeMembers || !parties.length) {
+    return parties
+  }
+
+  const membersByPartyId = new Map()
+  const allMembers = await getMany(
+    db,
+    `
+      SELECT *
+      FROM party_members
+      WHERE party_id IN (${parties.map(() => "?").join(", ")})
+      ORDER BY joined_at ASC
+    `,
+    parties.map((party) => party.id)
+  )
+
+  for (const member of allMembers) {
+    const members = membersByPartyId.get(member.party_id) || []
+    members.push(member)
+    membersByPartyId.set(member.party_id, members)
+  }
+
+  return parties.map((party) => ({
+    ...party,
+    members: membersByPartyId.get(party.id) || []
+  }))
+}
+
 async function joinParty({
   partyId,
   userId,
@@ -1282,6 +1328,7 @@ module.exports = {
   getPartyByRecruitMessageId,
   importParty,
   joinParty,
+  listRecruitingParties,
   kickPartyMember,
   leaveParty,
   listGuildParties,
