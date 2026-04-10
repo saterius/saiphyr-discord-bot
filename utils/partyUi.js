@@ -291,8 +291,8 @@ function buildPartyActionRows(party) {
       .setStyle(ButtonStyle.Danger)
       .setDisabled(cancelDisabled),
     new ButtonBuilder()
-      .setCustomId(`party:refresh:${party.id}`)
-      .setLabel("รีเฟรช")
+      .setCustomId(`party:repost:${party.id}`)
+      .setLabel("รีโพสต์")
       .setStyle(ButtonStyle.Secondary)
   )
 

@@ -67,6 +67,48 @@ async function refreshPartyRecruitmentMessage(client, partyId) {
   return party
 }
 
+async function repostPartyRecruitmentMessage(client, partyId, { sourceMessageId = null } = {}) {
+  const party = await partyService.getPartyById(partyId)
+
+  if (!party.recruit_channel_id) {
+    return party
+  }
+
+  const channel = await fetchTextChannel(client, party.recruit_channel_id)
+  if (!channel || !channel.isTextBased()) {
+    return party
+  }
+
+  const oldMessageId = party.recruit_message_id
+  const newMessage = await channel.send({
+    embeds: [buildPartyEmbed(party)],
+    components: buildPartyActionRows(party)
+  })
+
+  const updatedParty = await partyService.updatePartyResources({
+    partyId,
+    recruitChannelId: channel.id,
+    recruitMessageId: newMessage.id
+  })
+
+  const messageIdsToDelete = new Set([oldMessageId, sourceMessageId].filter(Boolean))
+  messageIdsToDelete.delete(newMessage.id)
+
+  for (const messageId of messageIdsToDelete) {
+    const oldMessage = await channel.messages.fetch(messageId).catch(() => null)
+    if (oldMessage) {
+      await oldMessage.delete().catch(() => null)
+    }
+  }
+
+  await newMessage.edit({
+    embeds: [buildPartyEmbed(updatedParty)],
+    components: buildPartyActionRows(updatedParty)
+  }).catch(() => null)
+
+  return updatedParty
+}
+
 async function sendPartyConfirmationPrompt(client, partyId) {
   const party = await partyService.getPartyById(partyId)
 
@@ -253,6 +295,7 @@ module.exports = {
   postLockedScheduleBoardEntry,
   provisionPartyAndAnnounce,
   refreshPartyRecruitmentMessage,
+  repostPartyRecruitmentMessage,
   refreshScheduleVoteMessage,
   sendScheduleCompletionSuggestion,
   sendPartyConfirmationPrompt,
