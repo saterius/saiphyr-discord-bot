@@ -8,6 +8,7 @@ const {
   postLockedScheduleBoardEntry,
   provisionPartyAndAnnounce,
   refreshPartyRecruitmentMessage,
+  repostPartyRecruitmentMessage,
   refreshScheduleVoteMessage,
   sendPartyConfirmationPrompt,
   syncGuildScheduleBoard
@@ -88,8 +89,8 @@ function getButtonLockKey(interaction) {
       return `party:leave:${parts[0]}:${interaction.user.id}`
     }
 
-    if (action === "refresh") {
-      return `party:refresh:${parts[0]}:${interaction.user.id}`
+    if (action === "refresh" || action === "repost") {
+      return `party:repost:${parts[0]}:${interaction.user.id}`
     }
 
     if (action === "close_recruitment") {
@@ -354,17 +355,19 @@ async function handlePartyButton(interaction) {
     return true
   }
 
-  if (action === "refresh") {
+  if (action === "refresh" || action === "repost") {
     const partyId = Number(parts[0])
 
     await interaction.deferReply({
       flags: MessageFlags.Ephemeral
     })
 
-    await refreshPartyRecruitmentMessage(interaction.client, partyId)
+    await repostPartyRecruitmentMessage(interaction.client, partyId, {
+      sourceMessageId: interaction.message?.id || null
+    })
 
     await interaction.editReply({
-      content: `รีเฟรชปาร์ตี้ #${partyId} เรียบร้อยแล้ว`
+      content: `รีโพสต์ปาร์ตี้ #${partyId} เรียบร้อยแล้ว`
     })
 
     return true
