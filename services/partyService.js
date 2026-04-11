@@ -1265,6 +1265,54 @@ async function updatePartyResources({
   })
 }
 
+async function setPartyConfirmationPromptResources({
+  partyId,
+  promptChannelId,
+  promptMessageId
+}) {
+  requireValue(partyId, "partyId is required.")
+  requireValue(promptChannelId, "promptChannelId is required.")
+  requireValue(promptMessageId, "promptMessageId is required.")
+
+  return withTransaction("write", async (tx) => {
+    await getPartyRecord(tx, partyId)
+
+    await run(
+      tx,
+      `
+        UPDATE parties
+        SET confirmation_prompt_channel_id = ?,
+            confirmation_prompt_message_id = ?
+        WHERE id = ?
+      `,
+      [promptChannelId, promptMessageId, partyId]
+    )
+
+    return loadPartyDetails(tx, partyId)
+  })
+}
+
+async function clearPartyConfirmationPromptResources(partyId) {
+  requireValue(partyId, "partyId is required.")
+
+  return withTransaction("write", async (tx) => {
+    await getPartyRecord(tx, partyId)
+
+    await run(
+      tx,
+      `
+        UPDATE parties
+        SET confirmation_prompt_channel_id = NULL,
+            confirmation_prompt_message_id = NULL
+        WHERE id = ?
+      `,
+      [partyId]
+    )
+
+    return loadPartyDetails(tx, partyId)
+  })
+}
+
 async function updatePartyStatus({
   partyId,
   actorId,
@@ -1334,7 +1382,9 @@ module.exports = {
   listGuildParties,
   respondPartyConfirmation,
   activatePartyNow,
+  clearPartyConfirmationPromptResources,
   updatePartyMemberClass,
   updatePartyResources,
+  setPartyConfirmationPromptResources,
   updatePartyStatus
 }

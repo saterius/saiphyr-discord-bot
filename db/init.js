@@ -69,6 +69,16 @@ async function applySchemaFile(file) {
     }
   }
 
+  if (file.name === "14_party_confirmation_prompt_migration.sql") {
+    const hasPromptChannel = await columnExists("parties", "confirmation_prompt_channel_id")
+    const hasPromptMessage = await columnExists("parties", "confirmation_prompt_message_id")
+
+    if (hasPromptChannel && hasPromptMessage) {
+      console.log(`Skipping ${file.name} (confirmation prompt columns already exist).`)
+      return
+    }
+  }
+
   console.log(`Applying ${file.name}...`)
   await db.executeMultiple(file.sql)
 }

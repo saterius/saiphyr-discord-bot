@@ -5,6 +5,7 @@
 -- 10_parties.sql
 -- 11_party_type_migration.sql
 -- 12_party_planned_time_migration.sql
+-- 14_party_confirmation_prompt_migration.sql
 -- 15_guild_voice_configs.sql
 -- 16_guild_schedule_configs.sql
 -- 17_guild_schedule_board_state.sql

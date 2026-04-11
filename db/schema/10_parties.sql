@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS parties (
   leader_id TEXT NOT NULL,
   recruit_channel_id TEXT,
   recruit_message_id TEXT,
+  confirmation_prompt_channel_id TEXT,
+  confirmation_prompt_message_id TEXT,
   party_role_id TEXT,
   party_channel_id TEXT,
   name TEXT NOT NULL,
