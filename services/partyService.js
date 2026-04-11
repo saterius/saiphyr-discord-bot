@@ -666,6 +666,35 @@ async function listRecruitingParties({ includeMembers = false } = {}) {
   }))
 }
 
+async function listOverdueAdHocPartiesForAutoCancellation(referenceUnix = Math.floor(Date.now() / 1000)) {
+  return getMany(
+    db,
+    `
+      SELECT
+        id,
+        guild_id,
+        leader_id,
+        status,
+        party_type,
+        recruit_channel_id,
+        recruit_message_id,
+        planned_start_at_unix
+      FROM parties
+      WHERE party_type = ?
+        AND planned_start_at_unix IS NOT NULL
+        AND planned_start_at_unix <= ?
+        AND status IN (?, ?)
+      ORDER BY planned_start_at_unix ASC, id ASC
+    `,
+    [
+      PARTY_TYPE.AD_HOC,
+      referenceUnix - (60 * 60),
+      PARTY_STATUS.RECRUITING,
+      PARTY_STATUS.PENDING_CONFIRM
+    ]
+  )
+}
+
 async function joinParty({
   partyId,
   userId,
@@ -1376,6 +1405,7 @@ module.exports = {
   getPartyByRecruitMessageId,
   importParty,
   joinParty,
+  listOverdueAdHocPartiesForAutoCancellation,
   listRecruitingParties,
   kickPartyMember,
   leaveParty,
