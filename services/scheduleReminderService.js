@@ -1,14 +1,35 @@
+const partyService = require("./partyService")
 const scheduleService = require("./scheduleService")
 const {
   announceCancelledSchedule,
+  refreshPartyRecruitmentMessage,
   refreshScheduleVoteMessage,
   sendScheduleCompletionSuggestion,
   syncGuildScheduleBoard
 } = require("./partyMessageService")
 
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000
+const OVERDUE_AD_HOC_CANCEL_REASON = "ยกเลิกอัตโนมัติ เพราะเลยเวลานัดมาแล้วมากกว่า 1 ชั่วโมงและปาร์ตี้ยังไม่พร้อมลุย"
+const OVERDUE_SCHEDULE_CANCEL_REASON = "ยกเลิกอัตโนมัติ เพราะสมาชิกโหวตไม่ครบก่อนถึงเวลานัด"
+
 let reminderInterval = null
 let reminderRunning = false
+
+async function processOverdueAdHocPartyCancellations(client) {
+  const overdueParties = await partyService.listOverdueAdHocPartiesForAutoCancellation()
+
+  for (const party of overdueParties) {
+    await partyService.updatePartyStatus({
+      partyId: party.id,
+      actorId: party.leader_id,
+      status: "cancelled",
+      reason: OVERDUE_AD_HOC_CANCEL_REASON,
+      allowNonLeader: true
+    })
+
+    await refreshPartyRecruitmentMessage(client, party.id).catch(() => null)
+  }
+}
 
 async function processScheduleCompletionPrompts(client) {
   if (reminderRunning) {
@@ -18,12 +39,14 @@ async function processScheduleCompletionPrompts(client) {
   reminderRunning = true
 
   try {
+    await processOverdueAdHocPartyCancellations(client)
+
     const overdueVotingEvents = await scheduleService.listVotingScheduleEventsPastDue()
 
     for (const event of overdueVotingEvents) {
       await scheduleService.autoCancelScheduleEvent({
         eventId: event.id,
-        reason: "ยกเลิกอัตโนมัติ เพราะสมาชิกยอมรับไม่ครบก่อนถึงเวลานัด"
+        reason: OVERDUE_SCHEDULE_CANCEL_REASON
       })
 
       await refreshScheduleVoteMessage(client, event.id).catch(() => null)
@@ -48,7 +71,7 @@ async function processScheduleCompletionPrompts(client) {
       await syncGuildScheduleBoard(client, event.guild_id).catch(() => null)
     }
   } catch (error) {
-    console.error("Failed to process schedule completion prompts.")
+    console.error("Failed to process schedule reminder tasks.")
     console.error(error)
   } finally {
     reminderRunning = false
@@ -75,5 +98,6 @@ function startScheduleReminderLoop(client, intervalMs = DEFAULT_INTERVAL_MS) {
 
 module.exports = {
   processScheduleCompletionPrompts,
+  processOverdueAdHocPartyCancellations,
   startScheduleReminderLoop
 }
