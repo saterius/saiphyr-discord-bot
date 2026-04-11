@@ -5,6 +5,7 @@ const {
 const partyService = require("./partyService")
 const scheduleService = require("./scheduleService")
 const { provisionPartyResources } = require("./partyProvisioningService")
+const { PARTY_STATUS } = require("./partyConstants")
 const {
   getScheduleBoardState,
   getScheduleConfig,
@@ -42,8 +43,35 @@ async function fetchTextChannel(client, channelId, fallbackChannel = null) {
   return client.channels.fetch(channelId).catch(() => null)
 }
 
+async function clearPartyConfirmationPrompt(client, partyId, { party = null } = {}) {
+  const currentParty = party || await partyService.getPartyById(partyId)
+
+  if (!currentParty.confirmation_prompt_channel_id || !currentParty.confirmation_prompt_message_id) {
+    return currentParty
+  }
+
+  const channel = await fetchTextChannel(client, currentParty.confirmation_prompt_channel_id)
+  if (channel?.isTextBased()) {
+    const promptMessage = await channel.messages
+      .fetch(currentParty.confirmation_prompt_message_id)
+      .catch(() => null)
+
+    if (promptMessage) {
+      await promptMessage.delete().catch(() => null)
+    }
+  }
+
+  await partyService.clearPartyConfirmationPromptResources(partyId)
+
+  return currentParty
+}
+
 async function refreshPartyRecruitmentMessage(client, partyId) {
   const party = await partyService.getPartyById(partyId)
+
+  if (party.status !== PARTY_STATUS.PENDING_CONFIRM) {
+    await clearPartyConfirmationPrompt(client, partyId, { party })
+  }
 
   if (!party.recruit_channel_id || !party.recruit_message_id) {
     return party
@@ -112,18 +140,32 @@ async function repostPartyRecruitmentMessage(client, partyId, { sourceMessageId 
 async function sendPartyConfirmationPrompt(client, partyId) {
   const party = await partyService.getPartyById(partyId)
 
+  if (party.status !== PARTY_STATUS.PENDING_CONFIRM) {
+    return null
+  }
+
   if (!party.recruit_channel_id) {
     return null
   }
+
+  await clearPartyConfirmationPrompt(client, partyId, { party })
 
   const channel = await fetchTextChannel(client, party.recruit_channel_id)
   if (!channel || !channel.isTextBased()) {
     return null
   }
 
-  return channel.send({
+  const message = await channel.send({
     content: buildPartyConfirmationNotice(party)
   })
+
+  await partyService.setPartyConfirmationPromptResources({
+    partyId,
+    promptChannelId: message.channelId,
+    promptMessageId: message.id
+  })
+
+  return message
 }
 
 async function provisionPartyAndAnnounce(client, partyId) {
@@ -294,6 +336,7 @@ module.exports = {
   announceCancelledSchedule,
   postLockedScheduleBoardEntry,
   provisionPartyAndAnnounce,
+  clearPartyConfirmationPrompt,
   refreshPartyRecruitmentMessage,
   repostPartyRecruitmentMessage,
   refreshScheduleVoteMessage,
