@@ -250,6 +250,7 @@ function buildPartyActionRows(party) {
   const closeRecruitmentDisabled = party.status !== PARTY_STATUS.RECRUITING
   const activateNowDisabled = ![PARTY_STATUS.RECRUITING, PARTY_STATUS.PENDING_CONFIRM].includes(party.status)
   const cancelDisabled = [PARTY_STATUS.CLOSED, PARTY_STATUS.CANCELLED].includes(party.status)
+  const repostDisabled = ![PARTY_STATUS.RECRUITING, PARTY_STATUS.PENDING_CONFIRM].includes(party.status)
 
   const primaryRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -294,6 +295,7 @@ function buildPartyActionRows(party) {
       .setCustomId(`party:repost:${party.id}`)
       .setLabel("รีโพสต์")
       .setStyle(ButtonStyle.Secondary)
+      .setDisabled(repostDisabled)
   )
 
   return [primaryRow, secondaryRow]

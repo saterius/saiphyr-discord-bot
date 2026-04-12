@@ -6,6 +6,7 @@ const partyService = require("./partyService")
 const scheduleService = require("./scheduleService")
 const { provisionPartyResources } = require("./partyProvisioningService")
 const { PARTY_STATUS } = require("./partyConstants")
+const ServiceError = require("./serviceError")
 const {
   getScheduleBoardState,
   getScheduleConfig,
@@ -97,6 +98,14 @@ async function refreshPartyRecruitmentMessage(client, partyId) {
 
 async function repostPartyRecruitmentMessage(client, partyId, { sourceMessageId = null } = {}) {
   const party = await partyService.getPartyById(partyId)
+
+  if (![PARTY_STATUS.RECRUITING, PARTY_STATUS.PENDING_CONFIRM].includes(party.status)) {
+    throw new ServiceError(
+      "รีโพสต์ได้เฉพาะปาร์ตี้ที่ยังเปิดรับคนหรืออยู่ระหว่างรอยืนยันเท่านั้น",
+      "PARTY_REPOST_NOT_ALLOWED",
+      { partyId, status: party.status }
+    )
+  }
 
   if (!party.recruit_channel_id) {
     return party
