@@ -532,7 +532,7 @@ function buildScheduleActionRows(event) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`schedule:complete:${event.id}`)
-        .setLabel("เสร็จสิ้นตาราง")
+        .setLabel("เสร็จสิ้นตาราง(ผ่าน)")
         .setStyle(ButtonStyle.Success)
         .setDisabled(completeDisabled)
     )
@@ -544,12 +544,12 @@ function buildScheduleCompletionPromptRows(eventId, { disabled = false } = {}) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`schedule:complete:${eventId}`)
-        .setLabel("เสร็จสิ้นตาราง")
+        .setLabel("เสร็จสิ้นตาราง(ผ่าน)")
         .setStyle(ButtonStyle.Success)
         .setDisabled(disabled),
       new ButtonBuilder()
         .setCustomId(`schedule:cancel:${eventId}`)
-        .setLabel("ยกเลิกตาราง")
+        .setLabel("ยกเลิกตาราง(ไม่ผ่าน/ยกเลิก)")
         .setStyle(ButtonStyle.Danger)
         .setDisabled(disabled)
     )

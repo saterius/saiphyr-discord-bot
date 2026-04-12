@@ -2,6 +2,8 @@
 
 const partyService = require("../services/partyService")
 const scheduleService = require("../services/scheduleService")
+const { PARTY_TYPE } = require("../services/partyConstants")
+const { markPartyChannelCleared } = require("../services/partyProvisioningService")
 const ServiceError = require("../services/serviceError")
 const {
   announceCancelledSchedule,
@@ -561,6 +563,21 @@ async function handleScheduleButton(interaction) {
         ? "เสร็จสิ้นจากปุ่มแจ้งเตือนหลังเลยเวลานัด"
         : "เสร็จสิ้นจากปุ่มบนโพสต์ตารางนัด"
     })
+
+    const party = await partyService.getPartyById(event.party_id)
+
+    if (party.party_type === PARTY_TYPE.STATIC) {
+      const partyChannel = party.party_channel_id
+        ? interaction.client.channels.cache.get(party.party_channel_id)
+          || await interaction.client.channels.fetch(party.party_channel_id).catch(() => null)
+        : null
+
+      if (partyChannel?.isTextBased()) {
+        await partyChannel.send("======= สัปดาห์นี้ ปาร์ตี้นี้ลงผ่านเเล้ว รอนัดใหม่ =======").catch(() => null)
+      }
+
+      await markPartyChannelCleared(interaction.guild, party.id).catch(() => null)
+    }
 
     await refreshScheduleVoteMessage(interaction.client, eventId)
     await syncGuildScheduleBoard(interaction.client, event.guild_id)

@@ -20,6 +20,24 @@ function defaultChannelName(party) {
     || `party-${party.id}`
 }
 
+function buildClearedChannelName(channelName) {
+  const normalizedName = String(channelName || "").trim().toLowerCase() || "party"
+  const suffix = "-cleared"
+
+  if (normalizedName.endsWith(suffix)) {
+    return normalizedName
+  }
+
+  const maxBaseLength = 100 - suffix.length
+  const baseName = normalizedName.slice(0, maxBaseLength).replace(/-+$/g, "") || "party"
+  return `${baseName}${suffix}`
+}
+
+function buildUnclearedChannelName(channelName) {
+  const normalizedName = String(channelName || "").trim().toLowerCase() || "party"
+  return normalizedName.replace(/-cleared$/i, "") || "party"
+}
+
 async function resolveRole(guild, party, roleName) {
   if (party.party_role_id) {
     const existingRole = guild.roles.cache.get(party.party_role_id)
@@ -96,6 +114,62 @@ async function assignPartyRole(guild, party, role) {
   }
 }
 
+async function markPartyChannelCleared(guild, partyId) {
+  if (!guild) {
+    throw new ServiceError("guild is required.", "VALIDATION_ERROR")
+  }
+
+  const party = await partyService.getPartyById(partyId)
+
+  if (!party.party_channel_id) {
+    return null
+  }
+
+  const channel = guild.channels.cache.get(party.party_channel_id)
+    || await guild.channels.fetch(party.party_channel_id).catch(() => null)
+
+  if (!channel) {
+    return null
+  }
+
+  const nextName = buildClearedChannelName(channel.name)
+
+  if (channel.name === nextName) {
+    return channel
+  }
+
+  await channel.setName(nextName, `Marking party ${party.id} as cleared`).catch(() => null)
+  return channel
+}
+
+async function clearPartyChannelClearedMark(guild, partyId) {
+  if (!guild) {
+    throw new ServiceError("guild is required.", "VALIDATION_ERROR")
+  }
+
+  const party = await partyService.getPartyById(partyId)
+
+  if (!party.party_channel_id) {
+    return null
+  }
+
+  const channel = guild.channels.cache.get(party.party_channel_id)
+    || await guild.channels.fetch(party.party_channel_id).catch(() => null)
+
+  if (!channel) {
+    return null
+  }
+
+  const nextName = buildUnclearedChannelName(channel.name)
+
+  if (channel.name === nextName) {
+    return null
+  }
+
+  await channel.setName(nextName, `Clearing cleared mark for party ${party.id}`).catch(() => null)
+  return channel
+}
+
 async function provisionPartyResources(guild, partyId, options = {}) {
   if (!guild) {
     throw new ServiceError("guild is required.", "VALIDATION_ERROR")
@@ -135,5 +209,7 @@ async function provisionPartyResources(guild, partyId, options = {}) {
 }
 
 module.exports = {
-  provisionPartyResources
+  provisionPartyResources,
+  markPartyChannelCleared,
+  clearPartyChannelClearedMark
 }
