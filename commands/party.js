@@ -670,6 +670,10 @@ module.exports = {
         `ถ้าตรวจสอบยอดเรียบร้อยแล้ว กดรีแอค ✅ เพื่อกันลืมด้วยนะครับ!`
       ].filter(Boolean).join("\n")
 
+      if (currentParty?.party_type === PARTY_TYPE.STATIC && interaction.channel?.isTextBased()) {
+        await interaction.channel.send("======= สัปดาห์นี้ ปาร์ตี้นี้ลงผ่านเเล้ว รอนัดใหม่ =======")
+      }
+
       const message = await targetChannel.send({
         content,
         allowedMentions: currentParty?.party_type === PARTY_TYPE.AD_HOC
