@@ -43,7 +43,11 @@ const COLORS = {
   reservedCard: "#fff3bf",
   reservedCardAlt: "#ffe8a3",
   reservedCardText: "#4f3b00",
-  reservedCardStroke: "#d6a400"
+  reservedCardStroke: "#d6a400",
+  completedCard: "#2f9e44",
+  completedCardAlt: "#2b8a3e",
+  completedCardText: "#ffffff",
+  completedCardStroke: "#1b5e20"
 }
 
 const THAI_DAY_NAMES = [
@@ -125,6 +129,14 @@ function formatMinutesLabel(totalMinutes) {
 }
 
 function getEntryCardStyle(entry, index) {
+  if (entry.status === SCHEDULE_STATUS.EXPIRED) {
+    return {
+      fill: index % 2 === 0 ? COLORS.completedCard : COLORS.completedCardAlt,
+      stroke: COLORS.completedCardStroke,
+      text: COLORS.completedCardText
+    }
+  }
+
   if (entry.status === SCHEDULE_STATUS.VOTING) {
     return {
       fill: index % 2 === 0 ? COLORS.reservedCard : COLORS.reservedCardAlt,
