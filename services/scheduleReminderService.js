@@ -116,6 +116,12 @@ async function processScheduleCompletionPrompts(client) {
       await announceCancelledSchedule(client, event.id).catch(() => null)
     }
 
+    const dueLockedEvents = await scheduleService.listLockedScheduleEventsPastStart()
+
+    for (const event of dueLockedEvents) {
+      await refreshScheduleVoteMessage(client, event.id).catch(() => null)
+    }
+
     const events = await scheduleService.listScheduleEventsNeedingCompletionPrompt()
 
     for (const event of events) {
