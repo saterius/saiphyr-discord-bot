@@ -132,6 +132,8 @@ module.exports = {
         boardChannelId: resolvedBoardChannelId
       })
 
+      await syncGuildScheduleBoard(interaction.client, interaction.guildId, resolvedBoardChannelId)
+
       await interaction.editReply({
         content: `ตารางเวลา #${event.id} ถูกสร้างแล้ว บอร์ด: <#${resolvedBoardChannelId}>`
       })

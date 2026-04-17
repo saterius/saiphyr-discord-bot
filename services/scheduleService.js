@@ -1004,8 +1004,14 @@ async function markScheduleCompletionPromptSent({
   )
 }
 
-async function listGuildLockedScheduleEntries(guildId) {
+async function listGuildScheduleEntriesByStatuses(guildId, statuses) {
   requireValue(guildId, "guildId is required.")
+
+  if (!Array.isArray(statuses) || !statuses.length) {
+    throw new ServiceError("At least one schedule status is required.", "VALIDATION_ERROR")
+  }
+
+  const statusPlaceholders = statuses.map(() => "?").join(", ")
 
   return getMany(
     db,
@@ -1015,6 +1021,8 @@ async function listGuildLockedScheduleEntries(guildId) {
         se.party_id,
         se.title,
         se.description,
+        se.proposed_start_at,
+        se.proposed_end_at,
         se.status,
         se.timezone,
         se.source_channel_id,
@@ -1031,7 +1039,7 @@ async function listGuildLockedScheduleEntries(guildId) {
       INNER JOIN schedule_event_times setm ON setm.event_id = se.id
       WHERE p.guild_id = ?
         AND p.party_type = ?
-        AND se.status = ?
+        AND se.status IN (${statusPlaceholders})
       ORDER BY
         CASE
           WHEN setm.start_at_unix IS NULL THEN 1
@@ -1041,8 +1049,19 @@ async function listGuildLockedScheduleEntries(guildId) {
         se.proposed_start_at ASC,
         se.id ASC
     `,
-    [guildId, PARTY_TYPE.STATIC, SCHEDULE_STATUS.LOCKED]
+    [guildId, PARTY_TYPE.STATIC, ...statuses]
   )
+}
+
+async function listGuildScheduleBoardEntries(guildId) {
+  return listGuildScheduleEntriesByStatuses(guildId, [
+    SCHEDULE_STATUS.VOTING,
+    SCHEDULE_STATUS.LOCKED
+  ])
+}
+
+async function listGuildLockedScheduleEntries(guildId) {
+  return listGuildScheduleEntriesByStatuses(guildId, [SCHEDULE_STATUS.LOCKED])
 }
 
 module.exports = {
@@ -1054,6 +1073,7 @@ module.exports = {
   getScheduleEventById,
   getLatestScheduleEventForParty,
   getVotingScheduleEventForParty,
+  listGuildScheduleBoardEntries,
   listGuildLockedScheduleEntries,
   listLockedScheduleEventsPastStart,
   listScheduleEventsNeedingCompletionPrompt,

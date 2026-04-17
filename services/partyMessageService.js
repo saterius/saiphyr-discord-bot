@@ -254,7 +254,7 @@ async function syncGuildScheduleBoard(client, guildId, explicitBoardChannelId = 
     return null
   }
 
-  const entries = await scheduleService.listGuildLockedScheduleEntries(guildId)
+  const entries = await scheduleService.listGuildScheduleBoardEntries(guildId)
   const embeds = buildScheduleBoardOverviewEmbeds(entries, guildId)
   const boardImage = await createScheduleBoardImage(entries)
   const files = boardImage
