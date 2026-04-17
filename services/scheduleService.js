@@ -28,6 +28,15 @@ function requireValue(value, message, code = "VALIDATION_ERROR") {
   }
 }
 
+function getCurrentUnixSeconds() {
+  return Math.floor(Date.now() / 1000)
+}
+
+function isScheduleStartDue(event, nowUnix = getCurrentUnixSeconds()) {
+  const startAtUnix = Number(event?.start_at_unix)
+  return Number.isFinite(startAtUnix) && startAtUnix <= nowUnix
+}
+
 async function getPartyForScheduling(executor, partyId) {
   const party = await getOne(
     executor,
@@ -725,6 +734,15 @@ async function completeScheduleEvent({
       )
     }
 
+    const nowUnix = getCurrentUnixSeconds()
+    if (!isScheduleStartDue(event, nowUnix)) {
+      throw new ServiceError(
+        "ยังไม่ถึงเวลานัด จึงยังไม่สามารถกดเสร็จสิ้นตารางได้",
+        "SCHEDULE_NOT_DUE",
+        { eventId, startAtUnix: event.start_at_unix, nowUnix }
+      )
+    }
+
     const completedAt = now()
 
     await run(
@@ -883,6 +901,44 @@ async function listVotingScheduleEventsPastDue({
   )
 }
 
+async function listLockedScheduleEventsPastStart({
+  nowUnix = Math.floor(Date.now() / 1000)
+} = {}) {
+  return getMany(
+    db,
+    `
+      SELECT
+        se.id,
+        se.party_id,
+        se.title,
+        se.description,
+        se.proposed_start_at,
+        se.status,
+        se.timezone,
+        se.source_channel_id,
+        se.vote_message_id,
+        se.board_channel_id,
+        se.board_message_id,
+        setm.start_at_unix,
+        setm.end_at_unix,
+        p.guild_id,
+        p.name AS party_name,
+        p.leader_id,
+        p.party_role_id,
+        p.party_channel_id,
+        p.party_type
+      FROM schedule_events se
+      INNER JOIN parties p ON p.id = se.party_id
+      INNER JOIN schedule_event_times setm ON setm.event_id = se.id
+      WHERE se.status = ?
+        AND setm.start_at_unix IS NOT NULL
+        AND setm.start_at_unix <= ?
+      ORDER BY setm.start_at_unix ASC, se.id ASC
+    `,
+    [SCHEDULE_STATUS.LOCKED, nowUnix]
+  )
+}
+
 async function autoCancelScheduleEvent({
   eventId,
   reason = "Schedule expired before every member accepted."
@@ -999,6 +1055,7 @@ module.exports = {
   getLatestScheduleEventForParty,
   getVotingScheduleEventForParty,
   listGuildLockedScheduleEntries,
+  listLockedScheduleEventsPastStart,
   listScheduleEventsNeedingCompletionPrompt,
   listVotingScheduleEventsPastDue,
   listPartyScheduleEvents,

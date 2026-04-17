@@ -40,6 +40,11 @@ function renderDiscordTimestamp(unix, style = "F") {
   return `<t:${unix}:${style}>`
 }
 
+function isScheduleStartDue(event, nowUnix = Math.floor(Date.now() / 1000)) {
+  const startAtUnix = Number(event?.start_at_unix)
+  return Number.isFinite(startAtUnix) && startAtUnix <= nowUnix
+}
+
 function renderScheduleWindow(event) {
   if (event.start_at_unix) {
     const startFull = renderDiscordTimestamp(event.start_at_unix, "F")
@@ -504,7 +509,7 @@ function buildScheduleActionRows(event) {
   const voteDisabled = event.status !== SCHEDULE_STATUS.VOTING
   const lockDisabled = event.status !== SCHEDULE_STATUS.VOTING
   const cancelDisabled = [SCHEDULE_STATUS.CANCELLED, SCHEDULE_STATUS.EXPIRED].includes(event.status)
-  const completeDisabled = event.status !== SCHEDULE_STATUS.LOCKED
+  const completeDisabled = event.status !== SCHEDULE_STATUS.LOCKED || !isScheduleStartDue(event)
 
   return [
     new ActionRowBuilder().addComponents(
