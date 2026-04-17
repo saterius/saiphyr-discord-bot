@@ -255,8 +255,9 @@ async function syncGuildScheduleBoard(client, guildId, explicitBoardChannelId = 
   }
 
   const entries = await scheduleService.listGuildScheduleBoardEntries(guildId)
+  const imageEntries = await scheduleService.listGuildScheduleBoardImageEntries(guildId)
   const embeds = buildScheduleBoardOverviewEmbeds(entries, guildId)
-  const boardImage = await createScheduleBoardImage(entries)
+  const boardImage = await createScheduleBoardImage(imageEntries)
   const files = boardImage
     ? [new AttachmentBuilder(boardImage.buffer, { name: boardImage.name })]
     : []

@@ -1060,6 +1060,14 @@ async function listGuildScheduleBoardEntries(guildId) {
   ])
 }
 
+async function listGuildScheduleBoardImageEntries(guildId) {
+  return listGuildScheduleEntriesByStatuses(guildId, [
+    SCHEDULE_STATUS.VOTING,
+    SCHEDULE_STATUS.LOCKED,
+    SCHEDULE_STATUS.EXPIRED
+  ])
+}
+
 async function listGuildLockedScheduleEntries(guildId) {
   return listGuildScheduleEntriesByStatuses(guildId, [SCHEDULE_STATUS.LOCKED])
 }
@@ -1074,6 +1082,7 @@ module.exports = {
   getLatestScheduleEventForParty,
   getVotingScheduleEventForParty,
   listGuildScheduleBoardEntries,
+  listGuildScheduleBoardImageEntries,
   listGuildLockedScheduleEntries,
   listLockedScheduleEventsPastStart,
   listScheduleEventsNeedingCompletionPrompt,
