@@ -40,6 +40,15 @@ function renderDiscordTimestamp(unix, style = "F") {
   return `<t:${unix}:${style}>`
 }
 
+function renderScheduleBoardRange(boardRange) {
+  if (!boardRange?.rangeStartUnix || !boardRange?.rangeEndUnix) {
+    return null
+  }
+
+  const rangeEndUnix = boardRange.rangeEndUnix - (24 * 60 * 60)
+  return `${renderDiscordTimestamp(boardRange.rangeStartUnix, "D")} - ${renderDiscordTimestamp(rangeEndUnix, "D")}`
+}
+
 function isScheduleStartDue(event, nowUnix = Math.floor(Date.now() / 1000)) {
   const startAtUnix = Number(event?.start_at_unix)
   return Number.isFinite(startAtUnix) && startAtUnix <= nowUnix
@@ -433,7 +442,8 @@ function buildScheduleEmbed(event, party) {
     })
 }
 
-function buildScheduleBoardOverviewEmbeds(entries, guildId) {
+function buildScheduleBoardOverviewEmbeds(entries, guildId, { boardRange = null } = {}) {
+  const rangeLine = renderScheduleBoardRange(boardRange)
   const sortedEntries = [...entries].sort((a, b) => {
     const aHasUnix = Number.isFinite(a.start_at_unix)
     const bHasUnix = Number.isFinite(b.start_at_unix)
@@ -460,7 +470,11 @@ function buildScheduleBoardOverviewEmbeds(entries, guildId) {
     return [
       new EmbedBuilder()
         .setTitle("Schedule Board")
-        .setDescription("ยังไม่มีการกำหนดตารางนัดเวลาสำหรับปาร์ตี้.")
+        .setDescription(
+          rangeLine
+            ? `ยังไม่มีการกำหนดตารางนัดเวลาสำหรับปาร์ตี้ในช่วง ${rangeLine}.`
+            : "ยังไม่มีการกำหนดตารางนัดเวลาสำหรับปาร์ตี้."
+        )
         .setColor(0x495057)
     ]
   }
@@ -475,7 +489,11 @@ function buildScheduleBoardOverviewEmbeds(entries, guildId) {
       .setTitle(index === 0 ? "ตารางนัดเวลา" : `Schedule Board หน้า ${index + 1}`)
       .setDescription(
         index === 0
-          ? `ตารางการนัดเวลาปาร์ตี้\nมีรายการทั้งหมด: **${sortedEntries.length}** ปาร์ตี้`
+          ? [
+            "ตารางการนัดเวลาปาร์ตี้",
+            rangeLine ? `ช่วงวันที่: ${rangeLine}` : null,
+            `มีรายการทั้งหมด: **${sortedEntries.length}** ปาร์ตี้`
+          ].filter(Boolean).join("\n")
           : "ตารางการนัดเวลาปาร์ตี้"
       )
       .setColor(0x1971c2)

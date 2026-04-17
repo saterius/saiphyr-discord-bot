@@ -116,6 +116,26 @@ function startOfWeekSaturday(dayStartUnix) {
   return dayStartUnix - (daysSinceSaturday * DAY_SECONDS)
 }
 
+function getCurrentScheduleBoardRange(nowUnix = Math.floor(Date.now() / 1000)) {
+  const rangeStartUnix = startOfWeekSaturday(startOfBangkokDay(nowUnix))
+  const rangeEndUnix = rangeStartUnix + (7 * DAY_SECONDS)
+
+  return {
+    rangeStartUnix,
+    rangeEndUnix
+  }
+}
+
+function isScheduleBoardEntryInRange(entry, range = getCurrentScheduleBoardRange()) {
+  return Number.isFinite(entry?.start_at_unix)
+    && entry.start_at_unix >= range.rangeStartUnix
+    && entry.start_at_unix < range.rangeEndUnix
+}
+
+function filterScheduleBoardEntriesForRange(entries, range = getCurrentScheduleBoardRange()) {
+  return entries.filter((entry) => isScheduleBoardEntryInRange(entry, range))
+}
+
 function getTimeOfDayMinutes(unix) {
   const date = toBangkokDate(unix)
   return (date.getUTCHours() * 60) + date.getUTCMinutes()
@@ -370,9 +390,8 @@ function assignDayLanes(entries) {
   }))
 }
 
-function buildRollingSection(entries) {
-  const rangeStartUnix = startOfWeekSaturday(startOfBangkokDay(Math.floor(Date.now() / 1000)))
-  const rangeEndUnix = rangeStartUnix + (7 * DAY_SECONDS)
+function buildRollingSection(entries, range = getCurrentScheduleBoardRange()) {
+  const { rangeStartUnix, rangeEndUnix } = range
   const visibleEntries = entries
     .filter((entry) => Number.isFinite(entry.start_at_unix))
     .map((entry) => ({
@@ -669,7 +688,7 @@ function buildSvg(section) {
   }
 }
 
-async function createScheduleBoardImage(entries) {
+async function createScheduleBoardImage(entries, { range = getCurrentScheduleBoardRange() } = {}) {
   const sortedEntries = [...entries]
     .filter((entry) => Number.isFinite(entry.start_at_unix))
     .sort((a, b) => a.start_at_unix - b.start_at_unix)
@@ -678,7 +697,7 @@ async function createScheduleBoardImage(entries) {
     return null
   }
 
-  const section = buildRollingSection(sortedEntries)
+  const section = buildRollingSection(sortedEntries, range)
   const { svg } = buildSvg(section)
   const buffer = await sharp(Buffer.from(svg)).png().toBuffer()
 
@@ -689,5 +708,8 @@ async function createScheduleBoardImage(entries) {
 }
 
 module.exports = {
-  createScheduleBoardImage
+  createScheduleBoardImage,
+  filterScheduleBoardEntriesForRange,
+  getCurrentScheduleBoardRange,
+  isScheduleBoardEntryInRange
 }

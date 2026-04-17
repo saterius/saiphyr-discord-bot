@@ -26,7 +26,11 @@ const {
   buildScheduleEmbed,
   buildScheduleLockedNotice
 } = require("../utils/partyUi")
-const { createScheduleBoardImage } = require("../utils/scheduleBoardImage")
+const {
+  createScheduleBoardImage,
+  filterScheduleBoardEntriesForRange,
+  getCurrentScheduleBoardRange
+} = require("../utils/scheduleBoardImage")
 
 async function fetchTextChannel(client, channelId, fallbackChannel = null) {
   if (!channelId) {
@@ -256,8 +260,11 @@ async function syncGuildScheduleBoard(client, guildId, explicitBoardChannelId = 
 
   const entries = await scheduleService.listGuildScheduleBoardEntries(guildId)
   const imageEntries = await scheduleService.listGuildScheduleBoardImageEntries(guildId)
-  const embeds = buildScheduleBoardOverviewEmbeds(entries, guildId)
-  const boardImage = await createScheduleBoardImage(imageEntries)
+  const boardRange = getCurrentScheduleBoardRange()
+  const visibleEntries = filterScheduleBoardEntriesForRange(entries, boardRange)
+  const visibleImageEntries = filterScheduleBoardEntriesForRange(imageEntries, boardRange)
+  const embeds = buildScheduleBoardOverviewEmbeds(visibleEntries, guildId, { boardRange })
+  const boardImage = await createScheduleBoardImage(visibleImageEntries, { range: boardRange })
   const files = boardImage
     ? [new AttachmentBuilder(boardImage.buffer, { name: boardImage.name })]
     : []
