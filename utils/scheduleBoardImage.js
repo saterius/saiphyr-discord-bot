@@ -13,6 +13,7 @@ if (!process.env.FONTCONFIG_FILE && fs.existsSync(FONTCONFIG_FILE)) {
 }
 
 const sharp = require("sharp")
+const { SCHEDULE_STATUS } = require("../services/partyConstants")
 
 const CELL_HEIGHT = 86
 const DAY_WIDTH = 420
@@ -38,7 +39,11 @@ const COLORS = {
   card: "#d61f69",
   cardAlt: "#c2185b",
   cardText: "#ffffff",
-  cardStroke: "#7c1237"
+  cardStroke: "#7c1237",
+  reservedCard: "#fff3bf",
+  reservedCardAlt: "#ffe8a3",
+  reservedCardText: "#4f3b00",
+  reservedCardStroke: "#d6a400"
 }
 
 const THAI_DAY_NAMES = [
@@ -117,6 +122,22 @@ function formatMinutesLabel(totalMinutes) {
   const hours = Math.floor(normalizedMinutes / 60)
   const minutes = normalizedMinutes % 60
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`
+}
+
+function getEntryCardStyle(entry, index) {
+  if (entry.status === SCHEDULE_STATUS.VOTING) {
+    return {
+      fill: index % 2 === 0 ? COLORS.reservedCard : COLORS.reservedCardAlt,
+      stroke: COLORS.reservedCardStroke,
+      text: COLORS.reservedCardText
+    }
+  }
+
+  return {
+    fill: index % 2 === 0 ? COLORS.card : COLORS.cardAlt,
+    stroke: COLORS.cardStroke,
+    text: COLORS.cardText
+  }
 }
 
 function formatTimeRangeLabel(startMinutes) {
@@ -601,7 +622,7 @@ function buildSvg(section) {
       : rawLabel
     const labelLines = wrapLabel(compactLabel, maxCharsPerLine, 3)
     const fontSize = blockWidth < 170 ? 20 : labelLines.length >= 3 ? 22 : 28
-    const color = index % 2 === 0 ? COLORS.card : COLORS.cardAlt
+    const cardStyle = getEntryCardStyle(entry, index)
 
     parts.push(`
       <rect
@@ -609,8 +630,8 @@ function buildSvg(section) {
         y="${blockY}"
         width="${blockWidth}"
         height="${blockHeight}"
-        fill="${color}"
-        stroke="${COLORS.cardStroke}"
+        fill="${cardStyle.fill}"
+        stroke="${cardStyle.stroke}"
         stroke-width="2"
       />
     `)
@@ -622,7 +643,7 @@ function buildSvg(section) {
       height: blockHeight - (CARD_PADDING_Y * 2),
       lines: labelLines,
       fontSize,
-      fill: COLORS.cardText,
+      fill: cardStyle.text,
       weight: 700,
       lineHeight: 1.2
     }))
