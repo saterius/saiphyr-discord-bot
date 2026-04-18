@@ -1422,7 +1422,7 @@ async function updatePartyMemberClass({
     const party = await getPartyRecord(tx, partyId)
     ensurePartyOpenForRosterChanges(party)
 
-    if (![PARTY_STATUS.RECRUITING, PARTY_STATUS.PENDING_CONFIRM].includes(party.status)) {
+    if (!OPEN_PARTY_STATUSES.includes(party.status)) {
       throw new ServiceError(
         "ปาร์ตี้นี้ยังไม่อยู่ในช่วงที่เปลี่ยนอาชีพได้",
         "PARTY_CLASS_CHANGE_NOT_ALLOWED",

@@ -300,6 +300,23 @@ module.exports = {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName("changeclass")
+        .setDescription("Change your class in this party channel")
+        .addStringOption((option) =>
+          option
+            .setName("class")
+            .setDescription("Your new class")
+            .setRequired(true)
+            .addChoices(
+              ...dragonNestClasses.map((job) => ({
+                name: job.label,
+                value: job.key
+              }))
+            )
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName("leave")
         .setDescription("ออกจากปาร์ตี้ที่คุณอยู่")
         .addIntegerOption((option) =>
@@ -626,6 +643,50 @@ module.exports = {
 
       await interaction.editReply({
         content: `${oldMember} ถูกเปลี่ยนเป็น ${newMember} ในปาร์ตี้ #${partyId} แล้ว อาชีพ: ${classOption.label}${roleSynced ? " (อัปเดต role แล้ว)" : ""}`
+      })
+
+      return
+    }
+
+    if (subcommand === "changeclass") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+
+      const classKey = interaction.options.getString("class")
+      const classOption = getClassOption(classKey)
+
+      if (!classOption) {
+        throw new ServiceError(
+          "Class is not valid.",
+          "VALIDATION_ERROR",
+          { classKey }
+        )
+      }
+
+      const partyInChannel = await partyService.getPartyByChannelId(interaction.channelId)
+      if (!partyInChannel) {
+        throw new ServiceError(
+          "กรุณาใช้คำสั่งนี้ในห้องปาร์ตี้เท่านั้น",
+          "PARTY_CHANNEL_REQUIRED",
+          { channelId: interaction.channelId }
+        )
+      }
+      const partyId = partyInChannel.id
+
+      const party = await partyService.updatePartyMemberClass({
+        partyId,
+        userId: interaction.user.id,
+        classKey,
+        classLabel: classOption.label
+      })
+
+      await refreshPartyRecruitmentMessage(interaction.client, partyId)
+
+      if ([PARTY_STATUS.ACTIVE, PARTY_STATUS.SCHEDULED].includes(party.status)) {
+        await syncGuildScheduleBoard(interaction.client, interaction.guildId).catch(() => null)
+      }
+
+      await interaction.editReply({
+        content: `เปลี่ยนอาชีพของคุณในปาร์ตี้ #${partyId} เป็น ${classOption.label} เรียบร้อยแล้ว`
       })
 
       return
