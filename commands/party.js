@@ -805,7 +805,7 @@ module.exports = {
 
       const amounts = parseGoldExpression(amountsInput)
       const grossTotal = amounts.reduce((sum, value) => sum + value, 0)
-      const stampCost = stampCount * 2
+      const stampCost = stampCount * 3
       const netTotal = grossTotal - stampCost
 
       if (netTotal < 0) {
@@ -836,7 +836,7 @@ module.exports = {
           : null,
         `สรุปยอดเงินปาร์ตี้ (${memberCount} คน)`,
         `รายการเงิน: ${amounts.join(" + ")} = ${formatGold(grossTotal)}`,
-        `ค่าสแตมป์: ${stampCount} x 2 = ${formatGold(stampCost)}`,
+        `ค่าสแตมป์: ${stampCount} x 3 = ${formatGold(stampCost)}`,
         `เงินหลังหักค่าสแตมป์: ${formatGold(netTotal)}`,
         `หาร ${memberCount} คน = \`${formatGold(perMember)}\` / คน`,
         stampCount > 0
