@@ -1205,6 +1205,209 @@ async function leaveParty({
   })
 }
 
+async function replacePartyMember({
+  partyId,
+  actorId,
+  oldUserId,
+  newUserId,
+  classKey,
+  classLabel = null,
+  reason = "member_changed"
+}) {
+  requireValue(partyId, "partyId is required.")
+  requireValue(actorId, "actorId is required.")
+  requireValue(oldUserId, "oldUserId is required.")
+  requireValue(newUserId, "newUserId is required.")
+  requireValue(classKey, "classKey is required.")
+
+  if (oldUserId === newUserId) {
+    throw new ServiceError(
+      "สมาชิกเดิมและสมาชิกใหม่ต้องเป็นคนละคนกัน",
+      "SAME_MEMBER_CHANGE_TARGET",
+      { partyId, oldUserId, newUserId }
+    )
+  }
+
+  return withTransaction("write", async (tx) => {
+    const party = await getPartyRecord(tx, partyId)
+    ensurePartyOpenForRosterChanges(party)
+
+    if (party.leader_id !== actorId) {
+      throw new ServiceError(
+        "หัวหน้าปาร์ตี้เท่านั้นที่เปลี่ยนสมาชิกได้",
+        "NOT_PARTY_LEADER",
+        { partyId, actorId }
+      )
+    }
+
+    if (oldUserId === party.leader_id) {
+      throw new ServiceError(
+        "ยังไม่สามารถเปลี่ยนหัวหน้าปาร์ตี้ด้วยคำสั่งนี้ได้",
+        "LEADER_CANNOT_BE_REPLACED",
+        { partyId, oldUserId }
+      )
+    }
+
+    if (newUserId === party.leader_id) {
+      throw new ServiceError(
+        "หัวหน้าปาร์ตี้อยู่ในปาร์ตี้นี้อยู่แล้ว",
+        "NEW_MEMBER_ALREADY_LEADER",
+        { partyId, newUserId }
+      )
+    }
+
+    const oldMember = await getPartyMember(tx, partyId, oldUserId)
+    if (!oldMember || !ACTIVE_MEMBER_STATUSES.includes(oldMember.join_status)) {
+      throw new ServiceError(
+        "สมาชิกเดิมไม่ได้อยู่ในปาร์ตี้นี้",
+        "MEMBER_NOT_FOUND",
+        { partyId, oldUserId }
+      )
+    }
+
+    const existingNewMember = await getPartyMember(tx, partyId, newUserId)
+    if (existingNewMember && ACTIVE_MEMBER_STATUSES.includes(existingNewMember.join_status)) {
+      throw new ServiceError(
+        "สมาชิกใหม่อยู่ในปาร์ตี้นี้อยู่แล้ว",
+        "ALREADY_JOINED",
+        { partyId, newUserId }
+      )
+    }
+
+    const changedAt = now()
+    const nextJoinStatus = [PARTY_STATUS.ACTIVE, PARTY_STATUS.SCHEDULED].includes(party.status)
+      ? MEMBER_STATUS.CONFIRMED
+      : MEMBER_STATUS.JOINED
+    const nextConfirmedAt = nextJoinStatus === MEMBER_STATUS.CONFIRMED ? changedAt : null
+
+    await run(
+      tx,
+      `
+        UPDATE party_members
+        SET join_status = ?,
+            confirmed_at = NULL,
+            removed_at = ?,
+            removed_by = ?,
+            removal_reason = ?
+        WHERE party_id = ?
+          AND user_id = ?
+      `,
+      [MEMBER_STATUS.KICKED, changedAt, actorId, reason, partyId, oldUserId]
+    )
+
+    await run(
+      tx,
+      `
+        DELETE FROM party_confirmations
+        WHERE party_id = ?
+          AND user_id = ?
+      `,
+      [partyId, oldUserId]
+    )
+
+    if (existingNewMember) {
+      await run(
+        tx,
+        `
+          UPDATE party_members
+          SET class_key = ?,
+              class_label = ?,
+              slot_number = ?,
+              join_status = ?,
+              joined_at = ?,
+              confirmed_at = ?,
+              removed_at = NULL,
+              removed_by = NULL,
+              removal_reason = NULL
+          WHERE id = ?
+        `,
+        [
+          classKey,
+          classLabel,
+          oldMember.slot_number,
+          nextJoinStatus,
+          changedAt,
+          nextConfirmedAt,
+          existingNewMember.id
+        ]
+      )
+    } else {
+      await run(
+        tx,
+        `
+          INSERT INTO party_members (
+            party_id,
+            user_id,
+            class_key,
+            class_label,
+            slot_number,
+            join_status,
+            joined_at,
+            confirmed_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          partyId,
+          newUserId,
+          classKey,
+          classLabel,
+          oldMember.slot_number,
+          nextJoinStatus,
+          changedAt,
+          nextConfirmedAt
+        ]
+      )
+    }
+
+    let nextStatus = party.status
+    if ([PARTY_STATUS.RECRUITING, PARTY_STATUS.PENDING_CONFIRM].includes(party.status)) {
+      nextStatus = await syncPartyRosterState(tx, partyId)
+    }
+
+    if (nextStatus === PARTY_STATUS.PENDING_CONFIRM) {
+      await run(
+        tx,
+        `
+          INSERT INTO party_confirmations (party_id, user_id, response)
+          VALUES (?, ?, ?)
+          ON CONFLICT (party_id, user_id)
+          DO UPDATE SET
+            response = excluded.response,
+            responded_at = NULL,
+            note = NULL
+        `,
+        [partyId, newUserId, CONFIRMATION_RESPONSE.PENDING]
+      )
+    }
+
+    await insertPartyLog(tx, {
+      partyId,
+      actorId,
+      action: "member_changed",
+      targetUserId: newUserId,
+      meta: {
+        oldUserId,
+        newUserId,
+        previousClassKey: oldMember.class_key,
+        previousClassLabel: oldMember.class_label,
+        classKey,
+        classLabel,
+        slotNumber: oldMember.slot_number,
+        previousStatus: party.status,
+        nextStatus,
+        reason
+      }
+    })
+
+    return {
+      party: await loadPartyDetails(tx, partyId),
+      previousMember: oldMember,
+      changedAt
+    }
+  })
+}
+
 async function updatePartyMemberClass({
   partyId,
   userId,
@@ -1410,6 +1613,7 @@ module.exports = {
   kickPartyMember,
   leaveParty,
   listGuildParties,
+  replacePartyMember,
   respondPartyConfirmation,
   activatePartyNow,
   clearPartyConfirmationPromptResources,

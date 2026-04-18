@@ -18,19 +18,23 @@ const {
 } = require("../services/guildConfigService")
 const {
   MEMBER_STATUS,
+  PARTY_STATUS,
   PARTY_TYPE
 } = require("../services/partyConstants")
 const ServiceError = require("../services/serviceError")
 const {
   refreshScheduleVoteMessage,
+  sendPartyConfirmationPrompt,
   syncGuildScheduleBoard,
   refreshPartyRecruitmentMessage
 } = require("../services/partyMessageService")
 const {
   buildPartyActionRows,
   buildPartyEmbed,
-  buildClassSelectRow
+  buildClassSelectRow,
+  getClassOption
 } = require("../utils/partyUi")
+const dragonNestClasses = require("../data/dragonNestClasses")
 const { parseBangkokDateTimeRange } = require("../utils/dateTimeRange")
 
 function formatPartyType(type) {
@@ -63,6 +67,29 @@ function formatGold(value) {
   })
 
   return `${formatted}G`
+}
+
+async function syncPartyRoleForMemberChange(interaction, party, oldUserId, newUserId) {
+  if (!interaction.guild || !party?.party_role_id) {
+    return false
+  }
+
+  const role = interaction.guild.roles.cache.get(party.party_role_id)
+    || await interaction.guild.roles.fetch(party.party_role_id).catch(() => null)
+
+  if (!role) {
+    return false
+  }
+
+  const [oldGuildMember, newGuildMember] = await Promise.all([
+    interaction.guild.members.fetch(oldUserId).catch(() => null),
+    interaction.guild.members.fetch(newUserId).catch(() => null)
+  ])
+
+  await oldGuildMember?.roles.remove(role, `Changed party ${party.id} member`).catch(() => null)
+  await newGuildMember?.roles.add(role, `Changed party ${party.id} member`).catch(() => null)
+
+  return true
 }
 
 module.exports = {
@@ -240,6 +267,35 @@ module.exports = {
           option
             .setName("reason")
             .setDescription("เหตุผลที่เตะออก")
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("memberchange")
+        .setDescription("Change one party member to another member")
+        .addUserOption((option) =>
+          option
+            .setName("old_member")
+            .setDescription("Current party member to replace")
+            .setRequired(true)
+        )
+        .addUserOption((option) =>
+          option
+            .setName("new_member")
+            .setDescription("New member to add")
+            .setRequired(true)
+        )
+        .addStringOption((option) =>
+          option
+            .setName("class")
+            .setDescription("Class for the new member")
+            .setRequired(true)
+            .addChoices(
+              ...dragonNestClasses.map((job) => ({
+                name: job.label,
+                value: job.key
+              }))
+            )
         )
     )
     .addSubcommand((subcommand) =>
@@ -511,6 +567,65 @@ module.exports = {
 
       await interaction.editReply({
         content: `${member} ถูกนำออกจากปาร์ตี้ #${partyId}.${result.reopenedRecruitment ? " เปิดรับสมาชิกอีกครั้ง." : ""}`
+      })
+
+      return
+    }
+
+    if (subcommand === "memberchange") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+
+      const oldMember = interaction.options.getUser("old_member")
+      const newMember = interaction.options.getUser("new_member")
+      const classKey = interaction.options.getString("class")
+      const classOption = getClassOption(classKey)
+
+      if (!classOption) {
+        throw new ServiceError(
+          "Class is not valid.",
+          "VALIDATION_ERROR",
+          { classKey }
+        )
+      }
+
+      const partyInChannel = await partyService.getPartyByChannelId(interaction.channelId)
+      if (!partyInChannel) {
+        throw new ServiceError(
+          "กรุณาใช้คำสั่งนี้ในห้องปาร์ตี้เท่านั้น",
+          "PARTY_CHANNEL_REQUIRED",
+          { channelId: interaction.channelId }
+        )
+      }
+      const partyId = partyInChannel.id
+
+      const result = await partyService.replacePartyMember({
+        partyId,
+        actorId: interaction.user.id,
+        oldUserId: oldMember.id,
+        newUserId: newMember.id,
+        classKey,
+        classLabel: classOption.label
+      })
+
+      const roleSynced = await syncPartyRoleForMemberChange(
+        interaction,
+        result.party,
+        oldMember.id,
+        newMember.id
+      )
+
+      await refreshPartyRecruitmentMessage(interaction.client, partyId)
+
+      if (result.party.status === PARTY_STATUS.PENDING_CONFIRM) {
+        await sendPartyConfirmationPrompt(interaction.client, partyId)
+      }
+
+      if ([PARTY_STATUS.ACTIVE, PARTY_STATUS.SCHEDULED].includes(result.party.status)) {
+        await syncGuildScheduleBoard(interaction.client, interaction.guildId).catch(() => null)
+      }
+
+      await interaction.editReply({
+        content: `${oldMember} ถูกเปลี่ยนเป็น ${newMember} ในปาร์ตี้ #${partyId} แล้ว อาชีพ: ${classOption.label}${roleSynced ? " (อัปเดต role แล้ว)" : ""}`
       })
 
       return
