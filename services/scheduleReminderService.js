@@ -48,7 +48,7 @@ function getBangkokDateTimeParts(date = new Date()) {
 function shouldProcessWeeklyClearedChannelReset(current) {
   return current.weekday === "Sat"
     && current.hour === "08"
-    && Number(current.minute) <= 50
+    && Number(current.minute) <= 10
 }
 
 async function processOverdueAdHocPartyCancellations(client) {
