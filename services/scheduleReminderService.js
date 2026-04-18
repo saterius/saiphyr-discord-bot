@@ -45,6 +45,12 @@ function getBangkokDateTimeParts(date = new Date()) {
   }
 }
 
+function shouldProcessWeeklyClearedChannelReset(current) {
+  return current.weekday === "Sat"
+    && current.hour === "08"
+    && Number(current.minute) <= 50
+}
+
 async function processOverdueAdHocPartyCancellations(client) {
   const overdueParties = await partyService.listOverdueAdHocPartiesForAutoCancellation()
 
@@ -64,7 +70,7 @@ async function processOverdueAdHocPartyCancellations(client) {
 async function processWeeklyClearedChannelReset(client, date = new Date()) {
   const current = getBangkokDateTimeParts(date)
 
-  if (current.weekday !== "Sat" || current.hour !== "08" || current.minute !== "00") {
+  if (!shouldProcessWeeklyClearedChannelReset(current)) {
     return { skipped: true, reason: "not_reset_time" }
   }
 
@@ -167,6 +173,7 @@ function startScheduleReminderLoop(client, intervalMs = DEFAULT_INTERVAL_MS) {
 
 module.exports = {
   getBangkokDateTimeParts,
+  shouldProcessWeeklyClearedChannelReset,
   processScheduleCompletionPrompts,
   processOverdueAdHocPartyCancellations,
   processWeeklyClearedChannelReset,
