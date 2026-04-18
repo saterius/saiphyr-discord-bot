@@ -6,7 +6,6 @@ const {
 } = require("discord.js")
 
 const partyService = require("../services/partyService")
-const scheduleService = require("../services/scheduleService")
 const {
   createPartyCalculation
 } = require("../services/partyCalculationService")
@@ -23,7 +22,6 @@ const {
 } = require("../services/partyConstants")
 const ServiceError = require("../services/serviceError")
 const {
-  refreshScheduleVoteMessage,
   sendPartyConfirmationPrompt,
   syncGuildScheduleBoard,
   refreshPartyRecruitmentMessage
@@ -896,27 +894,8 @@ module.exports = {
         return
       }
 
-      let clearedScheduleEventId = null
-
-      if (currentParty?.party_type === PARTY_TYPE.STATIC) {
-        const lockedEvent = await scheduleService.getLockedScheduleEventForParty(currentParty.id)
-
-        if (lockedEvent) {
-          const completedEvent = await scheduleService.completeScheduleEvent({
-            eventId: lockedEvent.id,
-            actorId: interaction.user.id,
-            reason: "Auto-completed after /party cal",
-            allowNonLeader: true
-          })
-
-          await refreshScheduleVoteMessage(interaction.client, completedEvent.id).catch(() => null)
-          await syncGuildScheduleBoard(interaction.client, interaction.guildId).catch(() => null)
-          clearedScheduleEventId = completedEvent.id
-        }
-      }
-
       await interaction.editReply({
-        content: `โพสต์สรุปยอดเงินถูกส่งไปที่ <#${targetChannel.id}> แล้ว${clearedScheduleEventId ? ` และเคลียร์ตารางนัด #${clearedScheduleEventId} เรียบร้อยแล้ว` : ""}`
+        content: `โพสต์สรุปยอดเงินถูกส่งไปที่ <#${targetChannel.id}> แล้ว`
       })
 
       return
