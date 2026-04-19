@@ -18,11 +18,15 @@ const { SCHEDULE_STATUS } = require("../services/partyConstants")
 const CELL_HEIGHT = 86
 const DAY_WIDTH = 420
 const TIME_WIDTH = 176
+const UNSCHEDULED_WIDTH = 420
 const HEADER_HEIGHT = 80
 const WEEK_LABEL_HEIGHT = 68
 const PADDING = 28
 const CARD_PADDING_X = 14
 const CARD_PADDING_Y = 12
+const UNSCHEDULED_GAP = 18
+const UNSCHEDULED_ITEM_HEIGHT = 74
+const UNSCHEDULED_ITEM_GAP = 12
 const SLOT_SECONDS = 30 * 60
 const DAY_SECONDS = 24 * 60 * 60
 const BANGKOK_OFFSET_SECONDS = 7 * 60 * 60
@@ -47,7 +51,12 @@ const COLORS = {
   completedCard: "#2f9e44",
   completedCardAlt: "#2b8a3e",
   completedCardText: "#ffffff",
-  completedCardStroke: "#1b5e20"
+  completedCardStroke: "#1b5e20",
+  unscheduledPanel: "#fff7ed",
+  unscheduledHeader: "#9a3412",
+  unscheduledCard: "#ffffff",
+  unscheduledCardStroke: "#fed7aa",
+  unscheduledText: "#7c2d12"
 }
 
 const THAI_DAY_NAMES = [
@@ -537,8 +546,130 @@ function createSvgText({ text, x, y, width, height, fontSize, fill, weight = 400
   `
 }
 
+function createSvgLeftText({ lines, x, y, width, height, fontSize, fill, weight = 400, lineHeight = 1.25 }) {
+  const safeLines = (lines || []).filter(Boolean)
+  const fontFamily = `'${FONT_FAMILY}', Tahoma, sans-serif`
+  const totalTextHeight = safeLines.length * fontSize * lineHeight
+  const startY = y + ((height - totalTextHeight) / 2) + fontSize
+  const tspanNodes = safeLines
+    .map((line, index) => {
+      const dy = index === 0 ? 0 : fontSize * lineHeight
+      return `<tspan x="${x}" dy="${dy}">${escapeXml(line)}</tspan>`
+    })
+    .join("")
+
+  return `
+    <text
+      x="${x}"
+      y="${startY}"
+      fill="${fill}"
+      font-family="${fontFamily}"
+      font-size="${fontSize}"
+      font-weight="${weight}"
+      text-anchor="start"
+    >${tspanNodes}</text>
+  `
+}
+
+function getUnscheduledTitle() {
+  return "\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e44\u0e14\u0e49\u0e19\u0e31\u0e14\u0e40\u0e27\u0e25\u0e32"
+}
+
+function getUnscheduledEmptyText() {
+  return "\u0e04\u0e23\u0e1a\u0e41\u0e25\u0e49\u0e27"
+}
+
+function renderUnscheduledSidebar(parts, section, layout) {
+  const { height, sidebarX, sidebarY, sidebarHeight } = layout
+  const unscheduledParties = section.unscheduledParties || []
+  const titleHeight = 66
+  const contentX = sidebarX + 18
+  const contentWidth = UNSCHEDULED_WIDTH - 36
+  const listY = sidebarY + titleHeight + 14
+  const maxItems = Math.max(0, Math.floor((sidebarHeight - titleHeight - 24) / (UNSCHEDULED_ITEM_HEIGHT + UNSCHEDULED_ITEM_GAP)))
+  const visibleParties = unscheduledParties.slice(0, maxItems)
+  const remainingCount = Math.max(0, unscheduledParties.length - visibleParties.length)
+
+  parts.push(`
+    <rect x="${sidebarX}" y="${sidebarY}" width="${UNSCHEDULED_WIDTH}" height="${sidebarHeight}" rx="18" fill="${COLORS.unscheduledPanel}" />
+    <rect x="${sidebarX}" y="${sidebarY}" width="${UNSCHEDULED_WIDTH}" height="${titleHeight}" rx="18" fill="${COLORS.unscheduledHeader}" />
+    <rect x="${sidebarX}" y="${sidebarY + titleHeight - 18}" width="${UNSCHEDULED_WIDTH}" height="18" fill="${COLORS.unscheduledHeader}" />
+  `)
+
+  parts.push(createSvgText({
+    text: `${getUnscheduledTitle()} (${unscheduledParties.length})`,
+    x: sidebarX,
+    y: sidebarY,
+    width: UNSCHEDULED_WIDTH,
+    height: titleHeight,
+    fontSize: 26,
+    fill: COLORS.headerText,
+    weight: 700
+  }))
+
+  if (!visibleParties.length) {
+    parts.push(createSvgText({
+      text: getUnscheduledEmptyText(),
+      x: contentX,
+      y: listY,
+      width: contentWidth,
+      height: Math.max(80, height - listY - PADDING),
+      fontSize: 28,
+      fill: COLORS.muted,
+      weight: 700
+    }))
+    return
+  }
+
+  visibleParties.forEach((party, index) => {
+    const itemY = listY + (index * (UNSCHEDULED_ITEM_HEIGHT + UNSCHEDULED_ITEM_GAP))
+    const label = party.name || "#"
+    const labelLines = wrapLabel(label, 26, 2)
+
+    parts.push(`
+      <rect
+        x="${contentX}"
+        y="${itemY}"
+        width="${contentWidth}"
+        height="${UNSCHEDULED_ITEM_HEIGHT}"
+        rx="10"
+        fill="${COLORS.unscheduledCard}"
+        stroke="${COLORS.unscheduledCardStroke}"
+        stroke-width="2"
+      />
+    `)
+
+    parts.push(createSvgLeftText({
+      x: contentX + 16,
+      y: itemY + 8,
+      width: contentWidth - 32,
+      height: UNSCHEDULED_ITEM_HEIGHT - 16,
+      lines: labelLines,
+      fontSize: labelLines.length > 1 ? 20 : 24,
+      fill: COLORS.unscheduledText,
+      weight: 700,
+      lineHeight: 1.18
+    }))
+  })
+
+  if (remainingCount > 0) {
+    const moreY = listY + (visibleParties.length * (UNSCHEDULED_ITEM_HEIGHT + UNSCHEDULED_ITEM_GAP))
+    parts.push(createSvgText({
+      text: `+${remainingCount} more`,
+      x: contentX,
+      y: moreY,
+      width: contentWidth,
+      height: 40,
+      fontSize: 22,
+      fill: COLORS.muted,
+      weight: 700
+    }))
+  }
+}
+
 function buildSvg(section) {
-  const width = PADDING * 2 + TIME_WIDTH + (DAY_WIDTH * 7)
+  const hasUnscheduledSidebar = Array.isArray(section.unscheduledParties)
+  const width = PADDING * 2 + TIME_WIDTH + (DAY_WIDTH * 7) + (hasUnscheduledSidebar ? UNSCHEDULED_GAP + UNSCHEDULED_WIDTH : 0)
   const height = PADDING * 2 + HEADER_HEIGHT + WEEK_LABEL_HEIGHT + (section.slots.length * CELL_HEIGHT)
   const gridX = PADDING + TIME_WIDTH
   const gridY = PADDING + HEADER_HEIGHT + WEEK_LABEL_HEIGHT
@@ -680,6 +811,15 @@ function buildSvg(section) {
     }))
   })
 
+  if (hasUnscheduledSidebar) {
+    renderUnscheduledSidebar(parts, section, {
+      height,
+      sidebarX: PADDING + sectionWidth + UNSCHEDULED_GAP,
+      sidebarY: PADDING,
+      sidebarHeight: height - (PADDING * 2)
+    })
+  }
+
   parts.push("</svg>")
   return {
     svg: parts.join("\n"),
@@ -688,16 +828,22 @@ function buildSvg(section) {
   }
 }
 
-async function createScheduleBoardImage(entries, { range = getCurrentScheduleBoardRange() } = {}) {
+async function createScheduleBoardImage(entries, { range = getCurrentScheduleBoardRange(), unscheduledParties = null } = {}) {
   const sortedEntries = [...entries]
     .filter((entry) => Number.isFinite(entry.start_at_unix))
     .sort((a, b) => a.start_at_unix - b.start_at_unix)
+  const sortedUnscheduledParties = Array.isArray(unscheduledParties)
+    ? [...unscheduledParties].sort((a, b) => Number(a.id || 0) - Number(b.id || 0))
+    : null
 
-  if (!sortedEntries.length) {
+  if (!sortedEntries.length && !sortedUnscheduledParties?.length) {
     return null
   }
 
-  const section = buildRollingSection(sortedEntries, range)
+  const section = {
+    ...buildRollingSection(sortedEntries, range),
+    unscheduledParties: sortedUnscheduledParties
+  }
   const { svg } = buildSvg(section)
   const buffer = await sharp(Buffer.from(svg)).png().toBuffer()
 

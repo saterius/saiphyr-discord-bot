@@ -1068,6 +1068,48 @@ async function listGuildScheduleBoardImageEntries(guildId) {
   ])
 }
 
+async function listGuildUnscheduledScheduleBoardParties(guildId, {
+  rangeStartUnix,
+  rangeEndUnix
+} = {}) {
+  requireValue(guildId, "guildId is required.")
+  requireValue(rangeStartUnix, "rangeStartUnix is required.")
+  requireValue(rangeEndUnix, "rangeEndUnix is required.")
+
+  return getMany(
+    db,
+    `
+      SELECT
+        p.id,
+        p.name
+      FROM parties p
+      WHERE p.guild_id = ?
+        AND p.party_type = ?
+        AND p.status = ?
+        AND NOT EXISTS (
+          SELECT 1
+          FROM schedule_events se
+          INNER JOIN schedule_event_times setm ON setm.event_id = se.id
+          WHERE se.party_id = p.id
+            AND se.status IN (?, ?, ?)
+            AND setm.start_at_unix >= ?
+            AND setm.start_at_unix < ?
+        )
+      ORDER BY p.id ASC
+    `,
+    [
+      guildId,
+      PARTY_TYPE.STATIC,
+      PARTY_STATUS.ACTIVE,
+      SCHEDULE_STATUS.VOTING,
+      SCHEDULE_STATUS.LOCKED,
+      SCHEDULE_STATUS.EXPIRED,
+      rangeStartUnix,
+      rangeEndUnix
+    ]
+  )
+}
+
 async function listGuildLockedScheduleEntries(guildId) {
   return listGuildScheduleEntriesByStatuses(guildId, [SCHEDULE_STATUS.LOCKED])
 }
@@ -1083,6 +1125,7 @@ module.exports = {
   getVotingScheduleEventForParty,
   listGuildScheduleBoardEntries,
   listGuildScheduleBoardImageEntries,
+  listGuildUnscheduledScheduleBoardParties,
   listGuildLockedScheduleEntries,
   listLockedScheduleEventsPastStart,
   listScheduleEventsNeedingCompletionPrompt,
