@@ -90,6 +90,28 @@ async function syncPartyRoleForMemberChange(interaction, party, oldUserId, newUs
   return true
 }
 
+async function syncPartyRoleForAddedMember(interaction, party, userId) {
+  if (!interaction.guild || !party?.party_role_id) {
+    return false
+  }
+
+  const role = interaction.guild.roles.cache.get(party.party_role_id)
+    || await interaction.guild.roles.fetch(party.party_role_id).catch(() => null)
+
+  if (!role) {
+    return false
+  }
+
+  const guildMember = await interaction.guild.members.fetch(userId).catch(() => null)
+  if (!guildMember) {
+    return false
+  }
+
+  await guildMember.roles.add(role, `Added to party ${party.id}`).catch(() => null)
+
+  return true
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("party")
@@ -287,6 +309,29 @@ module.exports = {
           option
             .setName("class")
             .setDescription("Class for the new member")
+            .setRequired(true)
+            .addChoices(
+              ...dragonNestClasses.map((job) => ({
+                name: job.label,
+                value: job.key
+              }))
+            )
+        )
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("addmember")
+        .setDescription("Add a member to the active party in this channel")
+        .addUserOption((option) =>
+          option
+            .setName("member")
+            .setDescription("Member to add")
+            .setRequired(true)
+        )
+        .addStringOption((option) =>
+          option
+            .setName("class")
+            .setDescription("Class for the member")
             .setRequired(true)
             .addChoices(
               ...dragonNestClasses.map((job) => ({
@@ -641,6 +686,58 @@ module.exports = {
 
       await interaction.editReply({
         content: `${oldMember} ถูกเปลี่ยนเป็น ${newMember} ในปาร์ตี้ #${partyId} แล้ว อาชีพ: ${classOption.label}${roleSynced ? " (อัปเดต role แล้ว)" : ""}`
+      })
+
+      return
+    }
+
+    if (subcommand === "addmember") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+
+      const member = interaction.options.getUser("member")
+      const classKey = interaction.options.getString("class")
+      const classOption = getClassOption(classKey)
+
+      if (!classOption) {
+        throw new ServiceError(
+          "Class is not valid.",
+          "VALIDATION_ERROR",
+          { classKey }
+        )
+      }
+
+      const partyInChannel = await partyService.getPartyByChannelId(interaction.channelId)
+      if (!partyInChannel) {
+        throw new ServiceError(
+          "กรุณาใช้คำสั่งนี้ในห้องปาร์ตี้เท่านั้น",
+          "PARTY_CHANNEL_REQUIRED",
+          { channelId: interaction.channelId }
+        )
+      }
+      const partyId = partyInChannel.id
+
+      const result = await partyService.addPartyMember({
+        partyId,
+        actorId: interaction.user.id,
+        userId: member.id,
+        classKey,
+        classLabel: classOption.label
+      })
+
+      const roleSynced = await syncPartyRoleForAddedMember(
+        interaction,
+        result.party,
+        member.id
+      )
+
+      await refreshPartyRecruitmentMessage(interaction.client, partyId)
+
+      if ([PARTY_STATUS.ACTIVE, PARTY_STATUS.SCHEDULED].includes(result.party.status)) {
+        await syncGuildScheduleBoard(interaction.client, interaction.guildId).catch(() => null)
+      }
+
+      await interaction.editReply({
+        content: `${member} ถูกเพิ่มเข้าในปาร์ตี้ #${partyId} แล้ว อาชีพ: ${classOption.label}${roleSynced ? " (อัปเดต role แล้ว)" : ""}`
       })
 
       return

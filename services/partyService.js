@@ -1408,6 +1408,129 @@ async function replacePartyMember({
   })
 }
 
+async function addPartyMember({
+  partyId,
+  actorId,
+  userId,
+  classKey,
+  classLabel = null,
+  reason = "member_added_by_leader"
+}) {
+  requireValue(partyId, "partyId is required.")
+  requireValue(actorId, "actorId is required.")
+  requireValue(userId, "userId is required.")
+  requireValue(classKey, "classKey is required.")
+
+  return withTransaction("write", async (tx) => {
+    const party = await getPartyRecord(tx, partyId)
+    ensurePartyOpenForRosterChanges(party)
+
+    if (party.leader_id !== actorId) {
+      throw new ServiceError(
+        "หัวหน้าปาร์ตี้เท่านั้นที่เพิ่มสมาชิกได้",
+        "NOT_PARTY_LEADER",
+        { partyId, actorId }
+      )
+    }
+
+    if (![PARTY_STATUS.ACTIVE, PARTY_STATUS.SCHEDULED].includes(party.status)) {
+      throw new ServiceError(
+        "คำสั่งเพิ่มสมาชิกใช้ได้หลังเปิดปาร์ตี้แล้วเท่านั้น",
+        "PARTY_NOT_ACTIVE",
+        { partyId, status: party.status }
+      )
+    }
+
+    if (party.active_member_count >= party.max_members) {
+      throw new ServiceError("ปาร์ตี้นี้เต็มแล้ว", "PARTY_FULL", { partyId })
+    }
+
+    const existingMember = await getPartyMember(tx, partyId, userId)
+    if (existingMember && ACTIVE_MEMBER_STATUSES.includes(existingMember.join_status)) {
+      throw new ServiceError(
+        "สมาชิกนี้อยู่ในปาร์ตี้อยู่แล้ว",
+        "ALREADY_JOINED",
+        { partyId, userId }
+      )
+    }
+
+    const joinedAt = now()
+
+    if (existingMember) {
+      await run(
+        tx,
+        `
+          UPDATE party_members
+          SET class_key = ?,
+              class_label = ?,
+              slot_number = ?,
+              join_status = ?,
+              joined_at = ?,
+              confirmed_at = ?,
+              removed_at = NULL,
+              removed_by = NULL,
+              removal_reason = NULL
+          WHERE id = ?
+        `,
+        [
+          classKey,
+          classLabel,
+          null,
+          MEMBER_STATUS.CONFIRMED,
+          joinedAt,
+          joinedAt,
+          existingMember.id
+        ]
+      )
+    } else {
+      await run(
+        tx,
+        `
+          INSERT INTO party_members (
+            party_id,
+            user_id,
+            class_key,
+            class_label,
+            slot_number,
+            join_status,
+            joined_at,
+            confirmed_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          partyId,
+          userId,
+          classKey,
+          classLabel,
+          null,
+          MEMBER_STATUS.CONFIRMED,
+          joinedAt,
+          joinedAt
+        ]
+      )
+    }
+
+    await insertPartyLog(tx, {
+      partyId,
+      actorId,
+      action: "member_added",
+      targetUserId: userId,
+      meta: {
+        classKey,
+        classLabel,
+        previousStatus: existingMember?.join_status || null,
+        reason
+      }
+    })
+
+    return {
+      party: await loadPartyDetails(tx, partyId),
+      addedAt: joinedAt
+    }
+  })
+}
+
 async function updatePartyMemberClass({
   partyId,
   userId,
@@ -1613,6 +1736,7 @@ module.exports = {
   kickPartyMember,
   leaveParty,
   listGuildParties,
+  addPartyMember,
   replacePartyMember,
   respondPartyConfirmation,
   activatePartyNow,
