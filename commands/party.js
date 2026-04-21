@@ -965,32 +965,6 @@ module.exports = {
         })
       }
 
-      if (currentParty?.party_type === PARTY_TYPE.AD_HOC) {
-        const result = await finishParty({
-          guild: interaction.guild,
-          partyId: currentParty.id,
-          actorId: interaction.user.id,
-          reason: "Auto-finished after /party cal for ad-hoc party",
-          allowNonLeader: true
-        })
-
-        await refreshPartyRecruitmentMessage(interaction.client, currentParty.id)
-
-        const deletedBits = []
-        if (result.removedRole) {
-          deletedBits.push("ลบ role แล้ว")
-        }
-        if (result.removedChannel) {
-          deletedBits.push("ลบ channel แล้ว")
-        }
-
-        await interaction.editReply({
-          content: `โพสต์สรุปยอดเงินถูกส่งไปที่ <#${targetChannel.id}> แล้ว และปาร์ตี้ #${currentParty.id} ถูกปิดเรียบร้อย${deletedBits.length ? ` (${deletedBits.join(", ")})` : ""}`
-        })
-
-        return
-      }
-
       await interaction.editReply({
         content: `โพสต์สรุปยอดเงินถูกส่งไปที่ <#${targetChannel.id}> แล้ว`
       })
