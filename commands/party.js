@@ -344,6 +344,11 @@ module.exports = {
     )
     .addSubcommand((subcommand) =>
       subcommand
+        .setName("close")
+        .setDescription("Close/disband the active party in this channel")
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
         .setName("cal")
         .setDescription("คำนวณเงินหารแจกจ่ายกันในปาร์ตี้")
         .addStringOption((option) =>
@@ -512,6 +517,43 @@ module.exports = {
       return
     }
 
+
+    if (subcommand === "close") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+
+      const currentParty = await partyService.getPartyByChannelId(interaction.channelId).catch(() => null)
+
+      if (!currentParty) {
+        throw new ServiceError(
+          "ไม่พบปาร์ตี้ในห้องนี้",
+          "PARTY_NOT_FOUND",
+          { channelId: interaction.channelId }
+        )
+      }
+
+      if (currentParty.leader_id !== interaction.user.id) {
+        throw new ServiceError(
+          "หัวหน้าปาร์ตี้เท่านั้นที่ยุบปาร์ตี้ได้",
+          "NOT_PARTY_LEADER",
+          { partyId: currentParty.id, actorId: interaction.user.id }
+        )
+      }
+
+      if ([PARTY_STATUS.CLOSED, PARTY_STATUS.CANCELLED].includes(currentParty.status)) {
+        throw new ServiceError(
+          "ปาร์ตี้นี้ปิดไปแล้ว",
+          "PARTY_ALREADY_FINISHED",
+          { partyId: currentParty.id, status: currentParty.status }
+        )
+      }
+
+      await interaction.editReply({
+        content: `ต้องการที่จะ "ยุบปาร์ตี้" ปาร์ตี้ #${currentParty.id} (${currentParty.name}) จริงๆใช่ไหม`,
+        components: [buildPartyCloseConfirmRows(currentParty.id)]
+      })
+
+      return
+    }
 
     if (subcommand === "cal") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral })
