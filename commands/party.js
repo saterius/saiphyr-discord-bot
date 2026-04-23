@@ -115,7 +115,7 @@ async function syncPartyRoleForAddedMember(interaction, party, userId) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("party")
-    .setDescription("จัดการปาร์ตี้ Dragon Nest"
+    .setDescription("จัดการปาร์ตี้ Dragon Nest")
     .addSubcommand((subcommand) =>
       subcommand
         .setName("create")
@@ -153,7 +153,6 @@ module.exports = {
             .setMinValue(2)
             .setMaxValue(8)
         )
-
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -251,7 +250,6 @@ module.exports = {
             .setName("member_8")
             .setDescription("สมาชิกคนที่ 8")
         )
-
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -274,7 +272,6 @@ module.exports = {
             .setName("reason")
             .setDescription("เหตุผลที่เตะออก")
         )
-
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -304,7 +301,6 @@ module.exports = {
               }))
             )
         )
-
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -328,7 +324,6 @@ module.exports = {
               }))
             )
         )
-
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -346,8 +341,6 @@ module.exports = {
               }))
             )
         )
-    )
-
     )
     .addSubcommand((subcommand) =>
       subcommand
