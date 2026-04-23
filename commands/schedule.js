@@ -1,4 +1,4 @@
-﻿const {
+const {
   MessageFlags,
   SlashCommandBuilder
 } = require("discord.js")
@@ -16,6 +16,14 @@ const {
   buildScheduleEmbed
 } = require("../utils/partyUi")
 const { parseBangkokDateTimeRange } = require("../utils/dateTimeRange")
+
+async function fetchTextChannel(client, channelId) {
+  if (!channelId || !client?.channels?.fetch) {
+    return null
+  }
+
+  return client.channels.fetch(channelId).catch(() => null)
+}
 
 function ensurePartyChannel(interaction, party) {
   if (!party) {
@@ -56,7 +64,7 @@ module.exports = {
     .addSubcommand((subcommand) =>
       subcommand
         .setName("show")
-        .setDescription("แสดงตารางเวลาของปาร์ตี้")
+        .setDescription("แสดงตารางเวลาแบบโพสต์ซ้ำ")
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -66,16 +74,6 @@ module.exports = {
           option
             .setName("reason")
             .setDescription("เหตุผลที่ยกเลิก")
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("lock")
-        .setDescription("ล็อกตารางนัดเวลาแม้ยังยอมรับไม่ครบทุกคน")
-        .addStringOption((option) =>
-          option
-            .setName("reason")
-            .setDescription("เหตุผลที่ต้องล็อกตารางทันที")
         )
     ),
 
@@ -142,6 +140,8 @@ module.exports = {
     }
 
     if (subcommand === "show") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+
       const party = await resolvePartyFromChannel(interaction)
       const event = await scheduleService.getLatestScheduleEventForParty(party.id)
 
@@ -153,9 +153,42 @@ module.exports = {
         )
       }
 
-      await interaction.reply({
+      const repostChannel = interaction.channel
+      if (!repostChannel?.isTextBased()) {
+        throw new ServiceError(
+          "ช่องนี้ไม่สามารถส่งโพสต์ตารางเวลาได้",
+          "INVALID_CHANNEL",
+          { channelId: interaction.channelId }
+        )
+      }
+
+      const oldChannelId = event.source_channel_id
+      const oldMessageId = event.vote_message_id
+
+      const voteMessage = await repostChannel.send({
+        content: party.party_role_id ? `<@&${party.party_role_id}>` : `Party ${party.name}`,
         embeds: [buildScheduleEmbed(event, party)],
-        flags: MessageFlags.Ephemeral
+        components: buildScheduleActionRows(event)
+      })
+
+      if (oldChannelId && oldMessageId) {
+        const oldChannel = await fetchTextChannel(interaction.client, oldChannelId)
+        if (oldChannel?.isTextBased()) {
+          const oldMessage = await oldChannel.messages.fetch(oldMessageId).catch(() => null)
+          if (oldMessage) {
+            await oldMessage.delete().catch(() => null)
+          }
+        }
+      }
+
+      await scheduleService.updateScheduleMessages({
+        eventId: event.id,
+        sourceChannelId: repostChannel.id,
+        voteMessageId: voteMessage.id
+      })
+
+      await interaction.editReply({
+        content: `รีโพสต์ตารางเวลา #${event.id} ไปที่ <#${repostChannel.id}> แล้ว`
       })
 
       return
@@ -190,43 +223,6 @@ module.exports = {
       })
 
       return
-    }
-
-    if (subcommand === "lock") {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
-
-      const reason = interaction.options.getString("reason") || "Locked manually."
-      const party = await resolvePartyFromChannel(interaction)
-      const event = await scheduleService.getVotingScheduleEventForParty(party.id)
-
-      if (!event) {
-        throw new ServiceError(
-          "ปาร์ตี้นี้ไม่มีตารางที่กำลังโหวตและพร้อมให้ล็อก",
-          "SCHEDULE_NOT_FOUND",
-          { partyId: party.id }
-        )
-      }
-
-      if (event.leader_id !== interaction.user.id && event.creator_id !== interaction.user.id) {
-        throw new ServiceError(
-          "หัวหน้าปาร์ตี้หรือคนที่สร้างตารางนัดนี้เท่านั้นที่ล็อกตารางได้",
-          "NOT_SCHEDULE_MANAGER",
-          { eventId: event.id, actorId: interaction.user.id }
-        )
-      }
-
-      await scheduleService.lockScheduleEvent({
-        eventId: event.id,
-        actorId: interaction.user.id,
-        reason
-      })
-
-      await refreshScheduleVoteMessage(interaction.client, event.id)
-      await syncGuildScheduleBoard(interaction.client, interaction.guildId)
-
-      await interaction.editReply({
-        content: `ล็อกตารางนัดเวลา #${event.id} เรียบร้อยแล้ว`
-      })
     }
   }
 }

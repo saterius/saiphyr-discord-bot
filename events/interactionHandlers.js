@@ -2,6 +2,7 @@
 
 const partyService = require("../services/partyService")
 const scheduleService = require("../services/scheduleService")
+const { finishParty } = require("../services/partyLifecycleService")
 const { PARTY_TYPE } = require("../services/partyConstants")
 const { markPartyChannelCleared } = require("../services/partyProvisioningService")
 const ServiceError = require("../services/serviceError")
@@ -113,6 +114,14 @@ function getButtonLockKey(interaction) {
 
     if (action === "cancel_abort") {
       return `party:cancel_abort:${parts[0]}`
+    }
+
+    if (action === "close_confirm") {
+      return `party:close_confirm:${parts[0]}:${interaction.user.id}`
+    }
+
+    if (action === "close_abort") {
+      return `party:close_abort:${parts[0]}:${interaction.user.id}`
     }
 
   }
@@ -472,6 +481,61 @@ async function handlePartyButton(interaction) {
 
     await interaction.update({
       content: `ปาร์ตี้ #${partyId} ยังไม่ได้ถูกยกเลิก`,
+      components: []
+    })
+
+    return true
+  }
+
+  if (action === "close_confirm") {
+    const partyId = Number(parts[0])
+
+    await interaction.deferUpdate()
+
+    const party = await partyService.getPartyById(partyId)
+
+    if (party.leader_id !== interaction.user.id) {
+      throw new ServiceError(
+        "หัวหน้าปาร์ตี้เท่านั้นที่ยุบปาร์ตี้ได้",
+        "NOT_PARTY_LEADER",
+        { partyId, actorId: interaction.user.id }
+      )
+    }
+
+    const result = await finishParty({
+      guild: interaction.guild,
+      partyId,
+      actorId: interaction.user.id,
+      reason: "ยุบปาร์ตี้จาก /party close"
+    })
+
+    await refreshPartyRecruitmentMessage(interaction.client, partyId)
+
+    const deletedBits = []
+    if (result.deletedResources) {
+      if (result.removedRole) {
+        deletedBits.push("role removed")
+      }
+      if (result.removedChannel) {
+        deletedBits.push("channel deleted")
+      }
+    }
+
+    const extra = deletedBits.length ? ` (${deletedBits.join(", ")})` : ""
+
+    await interaction.editReply({
+      content: `ปาร์ตี้ #${partyId} ถูกยุบแล้ว${extra}`,
+      components: []
+    })
+
+    return true
+  }
+
+  if (action === "close_abort") {
+    const partyId = Number(parts[0])
+
+    await interaction.update({
+      content: `ยกเลิกการยุบปาร์ตี้ #${partyId} แล้ว`,
       components: []
     })
 

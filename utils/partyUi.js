@@ -368,6 +368,21 @@ function buildPartyCancelConfirmRows(partyId) {
   ]
 }
 
+function buildPartyCloseConfirmRows(partyId) {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`party:close_confirm:${partyId}`)
+        .setLabel("ยอมรับ")
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`party:close_abort:${partyId}`)
+        .setLabel("ปฏิเสธ")
+        .setStyle(ButtonStyle.Secondary)
+    )
+  ]
+}
+
 function buildScheduleEmbed(event, party) {
   const memberByUserId = new Map(
     (party?.members || []).map((member) => [member.user_id, member])
@@ -628,6 +643,7 @@ function buildScheduleCompletionNotice(event) {
 module.exports = {
   buildClassSelectRow,
   buildPartyCancelConfirmRows,
+  buildPartyCloseConfirmRows,
   buildJoinConfirmRows,
   buildPartyActionRows,
   buildPartyActivationNotice,
