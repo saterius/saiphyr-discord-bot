@@ -547,9 +547,11 @@ module.exports = {
         )
       }
 
+      const closeConfirmRows = buildPartyCloseConfirmRows(currentParty.id).map((row) => row.toJSON())
+
       await interaction.editReply({
         content: `ต้องการที่จะ "ยุบปาร์ตี้" ปาร์ตี้ #${currentParty.id} (${currentParty.name}) จริงๆใช่ไหม`,
-        components: [buildPartyCloseConfirmRows(currentParty.id)]
+        components: closeConfirmRows
       })
 
       return
