@@ -9,7 +9,6 @@ const partyService = require("../services/partyService")
 const {
   createPartyCalculation
 } = require("../services/partyCalculationService")
-const { finishParty } = require("../services/partyLifecycleService")
 const {
   getCalChannelConfig,
   getPartyChannelConfig,
@@ -30,6 +29,7 @@ const {
   buildPartyActionRows,
   buildPartyEmbed,
   buildClassSelectRow,
+  buildPartyCloseConfirmRows,
   getClassOption
 } = require("../utils/partyUi")
 const dragonNestClasses = require("../data/dragonNestClasses")
@@ -115,7 +115,7 @@ async function syncPartyRoleForAddedMember(interaction, party, userId) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("party")
-    .setDescription("จัดการปาร์ตี้ Dragon Nest")
+    .setDescription("จัดการปาร์ตี้ Dragon Nest"
     .addSubcommand((subcommand) =>
       subcommand
         .setName("create")
@@ -153,6 +153,7 @@ module.exports = {
             .setMinValue(2)
             .setMaxValue(8)
         )
+
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -250,22 +251,7 @@ module.exports = {
             .setName("member_8")
             .setDescription("สมาชิกคนที่ 8")
         )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("show")
-        .setDescription("แสดงข้อมูลปาร์ตี้")
-        .addIntegerOption((option) =>
-          option
-            .setName("party_id")
-            .setDescription("Party ID")
-            .setRequired(true)
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("list")
-        .setDescription("แสดงรายชื่อของแต่ละปาร์ตี้")
+
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -288,6 +274,7 @@ module.exports = {
             .setName("reason")
             .setDescription("เหตุผลที่เตะออก")
         )
+
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -317,6 +304,7 @@ module.exports = {
               }))
             )
         )
+
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -340,6 +328,7 @@ module.exports = {
               }))
             )
         )
+
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -358,57 +347,7 @@ module.exports = {
             )
         )
     )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("leave")
-        .setDescription("ออกจากปาร์ตี้ที่คุณอยู่")
-        .addIntegerOption((option) =>
-          option
-            .setName("party_id")
-            .setDescription("Party ID")
-            .setRequired(true)
-        )
-        .addStringOption((option) =>
-          option
-            .setName("reason")
-            .setDescription("เหตุผลที่ออกจากปาร์ตี้")
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("close")
-        .setDescription("ปิด หรือ ยกเลิกปาร์ตี้")
-        .addIntegerOption((option) =>
-          option
-            .setName("party_id")
-            .setDescription("Party ID")
-            .setRequired(true)
-        )
-        .addStringOption((option) =>
-          option
-            .setName("status")
-            .setDescription("สถานะ")
-            .setRequired(true)
-            .addChoices(
-              { name: "closed", value: "closed" },
-              { name: "cancelled", value: "cancelled" }
-            )
-        )
-        .addStringOption((option) =>
-          option
-            .setName("reason")
-            .setDescription("เหตุผลที่ปิด")
-        )
-    )
-    .addSubcommand((subcommand) =>
-      subcommand
-        .setName("finish")
-        .setDescription("จบปาร์ตี้นี้")
-        .addStringOption((option) =>
-          option
-            .setName("reason")
-            .setDescription("เหตุผลที่จบ")
-        )
+
     )
     .addSubcommand((subcommand) =>
       subcommand
@@ -580,297 +519,6 @@ module.exports = {
       return
     }
 
-    if (subcommand === "show") {
-      const partyId = interaction.options.getInteger("party_id")
-      const party = await partyService.getPartyById(partyId)
-
-      await interaction.reply({
-        embeds: [buildPartyEmbed(party)],
-        flags: MessageFlags.Ephemeral
-      })
-
-      return
-    }
-
-    if (subcommand === "list") {
-      const parties = await partyService.listGuildParties(interaction.guildId)
-
-      const content = parties.length
-        ? parties
-          .map((party) => `#${party.id} | ${party.name} | ${formatPartyType(party.party_type)} | ${party.status} | ${party.active_member_count}/${party.max_members}`)
-          .join("\n")
-        : "ไม่พบปาร์ตี้."
-
-      await interaction.reply({
-        content,
-        flags: MessageFlags.Ephemeral
-      })
-
-      return
-    }
-
-    if (subcommand === "kick") {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
-
-      const partyId = interaction.options.getInteger("party_id")
-      const member = interaction.options.getUser("member")
-      const reason = interaction.options.getString("reason")
-
-      const result = await partyService.kickPartyMember({
-        partyId,
-        actorId: interaction.user.id,
-        targetUserId: member.id,
-        reason
-      })
-
-      await refreshPartyRecruitmentMessage(interaction.client, partyId)
-
-      await interaction.editReply({
-        content: `${member} ถูกนำออกจากปาร์ตี้ #${partyId}.${result.reopenedRecruitment ? " เปิดรับสมาชิกอีกครั้ง." : ""}`
-      })
-
-      return
-    }
-
-    if (subcommand === "memberchange") {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
-
-      const oldMember = interaction.options.getUser("old_member")
-      const newMember = interaction.options.getUser("new_member")
-      const classKey = interaction.options.getString("class")
-      const classOption = getClassOption(classKey)
-
-      if (!classOption) {
-        throw new ServiceError(
-          "Class is not valid.",
-          "VALIDATION_ERROR",
-          { classKey }
-        )
-      }
-
-      const partyInChannel = await partyService.getPartyByChannelId(interaction.channelId)
-      if (!partyInChannel) {
-        throw new ServiceError(
-          "กรุณาใช้คำสั่งนี้ในห้องปาร์ตี้เท่านั้น",
-          "PARTY_CHANNEL_REQUIRED",
-          { channelId: interaction.channelId }
-        )
-      }
-      const partyId = partyInChannel.id
-
-      const result = await partyService.replacePartyMember({
-        partyId,
-        actorId: interaction.user.id,
-        oldUserId: oldMember.id,
-        newUserId: newMember.id,
-        classKey,
-        classLabel: classOption.label
-      })
-
-      const roleSynced = await syncPartyRoleForMemberChange(
-        interaction,
-        result.party,
-        oldMember.id,
-        newMember.id
-      )
-
-      await refreshPartyRecruitmentMessage(interaction.client, partyId)
-
-      if (result.party.status === PARTY_STATUS.PENDING_CONFIRM) {
-        await sendPartyConfirmationPrompt(interaction.client, partyId)
-      }
-
-      if ([PARTY_STATUS.ACTIVE, PARTY_STATUS.SCHEDULED].includes(result.party.status)) {
-        await syncGuildScheduleBoard(interaction.client, interaction.guildId).catch(() => null)
-      }
-
-      await interaction.editReply({
-        content: `${oldMember} ถูกเปลี่ยนเป็น ${newMember} ในปาร์ตี้ #${partyId} แล้ว อาชีพ: ${classOption.label}${roleSynced ? " (อัปเดต role แล้ว)" : ""}`
-      })
-
-      return
-    }
-
-    if (subcommand === "addmember") {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
-
-      const member = interaction.options.getUser("member")
-      const classKey = interaction.options.getString("class")
-      const classOption = getClassOption(classKey)
-
-      if (!classOption) {
-        throw new ServiceError(
-          "Class is not valid.",
-          "VALIDATION_ERROR",
-          { classKey }
-        )
-      }
-
-      const partyInChannel = await partyService.getPartyByChannelId(interaction.channelId)
-      if (!partyInChannel) {
-        throw new ServiceError(
-          "กรุณาใช้คำสั่งนี้ในห้องปาร์ตี้เท่านั้น",
-          "PARTY_CHANNEL_REQUIRED",
-          { channelId: interaction.channelId }
-        )
-      }
-      const partyId = partyInChannel.id
-
-      const result = await partyService.addPartyMember({
-        partyId,
-        actorId: interaction.user.id,
-        userId: member.id,
-        classKey,
-        classLabel: classOption.label
-      })
-
-      const roleSynced = await syncPartyRoleForAddedMember(
-        interaction,
-        result.party,
-        member.id
-      )
-
-      await refreshPartyRecruitmentMessage(interaction.client, partyId)
-
-      if ([PARTY_STATUS.ACTIVE, PARTY_STATUS.SCHEDULED].includes(result.party.status)) {
-        await syncGuildScheduleBoard(interaction.client, interaction.guildId).catch(() => null)
-      }
-
-      await interaction.editReply({
-        content: `${member} ถูกเพิ่มเข้าในปาร์ตี้ #${partyId} แล้ว อาชีพ: ${classOption.label}${roleSynced ? " (อัปเดต role แล้ว)" : ""}`
-      })
-
-      return
-    }
-
-    if (subcommand === "changeclass") {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
-
-      const classKey = interaction.options.getString("class")
-      const classOption = getClassOption(classKey)
-
-      if (!classOption) {
-        throw new ServiceError(
-          "Class is not valid.",
-          "VALIDATION_ERROR",
-          { classKey }
-        )
-      }
-
-      const partyInChannel = await partyService.getPartyByChannelId(interaction.channelId)
-      if (!partyInChannel) {
-        throw new ServiceError(
-          "กรุณาใช้คำสั่งนี้ในห้องปาร์ตี้เท่านั้น",
-          "PARTY_CHANNEL_REQUIRED",
-          { channelId: interaction.channelId }
-        )
-      }
-      const partyId = partyInChannel.id
-
-      const party = await partyService.updatePartyMemberClass({
-        partyId,
-        userId: interaction.user.id,
-        classKey,
-        classLabel: classOption.label
-      })
-
-      await refreshPartyRecruitmentMessage(interaction.client, partyId)
-
-      if ([PARTY_STATUS.ACTIVE, PARTY_STATUS.SCHEDULED].includes(party.status)) {
-        await syncGuildScheduleBoard(interaction.client, interaction.guildId).catch(() => null)
-      }
-
-      await interaction.editReply({
-        content: `เปลี่ยนอาชีพของคุณในปาร์ตี้ #${partyId} เป็น ${classOption.label} เรียบร้อยแล้ว`
-      })
-
-      return
-    }
-
-    if (subcommand === "leave") {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
-
-      const partyId = interaction.options.getInteger("party_id")
-      const reason = interaction.options.getString("reason") || "left"
-
-      const result = await partyService.leaveParty({
-        partyId,
-        userId: interaction.user.id,
-        reason
-      })
-
-      await refreshPartyRecruitmentMessage(interaction.client, partyId)
-
-      await interaction.editReply({
-        content: `คุณได้ออกจากปาร์ตี้ #${partyId}.${result.reopenedRecruitment ? " เปิดรับสมาชิกอีกครั้ง." : ""}`
-      })
-
-      return
-    }
-
-    if (subcommand === "close") {
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
-
-      const partyId = interaction.options.getInteger("party_id")
-      const status = interaction.options.getString("status")
-      const reason = interaction.options.getString("reason")
-
-      await partyService.updatePartyStatus({
-        partyId,
-        actorId: interaction.user.id,
-        status,
-        reason
-      })
-
-      await refreshPartyRecruitmentMessage(interaction.client, partyId)
-
-      await interaction.editReply({
-        content: `ปาร์ตี้ #${partyId} อัปเดตสถานะเป็น ${status}.`
-      })
-
-      return
-    }
-
-    if (subcommand === "finish") {
-      const party = await partyService.getPartyByChannelId(interaction.channelId)
-      if (!party) {
-        throw new ServiceError(
-          "ใช้คำสั่ง /party finish ได้เฉพาะในช่องของปาร์ตี้เท่านั้น.",
-          "PARTY_CHANNEL_REQUIRED",
-          { channelId: interaction.channelId }
-        )
-      }
-
-      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
-
-      const reason = interaction.options.getString("reason") || "Party finished"
-      const result = await finishParty({
-        guild: interaction.guild,
-        partyId: party.id,
-        actorId: interaction.user.id,
-        reason
-      })
-
-      await refreshPartyRecruitmentMessage(interaction.client, party.id)
-
-      const deletedBits = []
-      if (result.deletedResources) {
-        if (result.removedRole) {
-          deletedBits.push("role removed")
-        }
-        if (result.removedChannel) {
-          deletedBits.push("channel deleted")
-        }
-      }
-
-      const extra = deletedBits.length ? ` (${deletedBits.join(", ")})` : ""
-
-      await interaction.editReply({
-        content: `ปาร์ตี้ #${party.id} จบแล้ว.${extra}`
-      })
-
-      return
-    }
 
     if (subcommand === "cal") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral })
