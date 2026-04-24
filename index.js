@@ -7,6 +7,7 @@ const loadEvents = require("./utils/eventLoader")
 const deployCommands = require("./utils/deployCommands")
 const { startDailyPartyRecruitmentRepostLoop } = require("./services/partyRecruitmentRepostService")
 const { startScheduleReminderLoop } = require("./services/scheduleReminderService")
+const { startMonthlyRoleMentionLoop } = require("./services/monthlyRoleMentionService")
 
 const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
@@ -28,6 +29,7 @@ client.once("ready", async () => {
   await deployCommands()
   startScheduleReminderLoop(client)
   startDailyPartyRecruitmentRepostLoop(client)
+  startMonthlyRoleMentionLoop(client)
 })
 
 client.login(process.env.TOKEN)
