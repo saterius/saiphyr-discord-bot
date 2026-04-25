@@ -122,7 +122,8 @@ async function getScheduleEventRecord(executor, eventId) {
         p.status AS party_status,
         p.party_type,
         p.leader_id,
-        p.party_channel_id
+        p.party_channel_id,
+        p.party_role_id
       FROM schedule_events se
       INNER JOIN parties p ON p.id = se.party_id
       LEFT JOIN schedule_event_times setm ON setm.event_id = se.id
