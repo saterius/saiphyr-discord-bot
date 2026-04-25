@@ -89,6 +89,50 @@ function renderPartyPlannedTime(party) {
     : `${startFull} (${renderDiscordTimestamp(party.planned_start_at_unix, "R")})`
 }
 
+function formatScheduleLockedDateTime(unix, timezone = "Asia/Bangkok") {
+  if (!Number.isFinite(Number(unix))) {
+    return "-"
+  }
+
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    })
+      .formatToParts(new Date(Number(unix) * 1000))
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  )
+
+  return `${parts.weekday}, ${parts.day} ${parts.month} ${parts.year} ${parts.hour}:${parts.minute}`
+}
+
+function formatScheduleLockedTime(unix, timezone = "Asia/Bangkok") {
+  if (!Number.isFinite(Number(unix))) {
+    return "-"
+  }
+
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    })
+      .formatToParts(new Date(Number(unix) * 1000))
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  )
+
+  return `${parts.hour}:${parts.minute}`
+}
+
 function partyStatusLabel(status) {
   const labels = {
     [PARTY_STATUS.RECRUITING]: "กำลังรับคน",
@@ -623,9 +667,19 @@ function buildPartyPlannedTimeNotice(party) {
   return `เวลานัดลง: ${renderPartyPlannedTime(party)}`
 }
 
-function buildScheduleLockedNotice(event) {
-  const boardMention = event.board_channel_id ? `<#${event.board_channel_id}>` : "the schedule board"
-  return `ตารางนัดเวลาได้รับการล็อกแล้วที่ ${event.proposed_start_at}. ตารางนี้ถูกโพสต์ไปที่ ${boardMention}.`
+function buildScheduleLockedNotice(event, party = null) {
+  const roleMention = party?.party_role_id
+    ? `<@&${party.party_role_id}>`
+    : (party?.party_name || party?.name || "ตารางเวลาของคุณ")
+  const startLabel = formatScheduleLockedDateTime(event.start_at_unix, event.timezone)
+  const endLabel = event.end_at_unix
+    ? ` - ${formatScheduleLockedTime(event.end_at_unix, event.timezone)}`
+    : ""
+  const relativeLabel = Number.isFinite(Number(event.start_at_unix))
+    ? ` (${renderDiscordTimestamp(event.start_at_unix, "R")})`
+    : ""
+
+  return `${roleMention} ตารางเวลาของคุณคือ ${startLabel}${endLabel}${relativeLabel}`
 }
 
 function buildScheduleCancelledNotice(event) {

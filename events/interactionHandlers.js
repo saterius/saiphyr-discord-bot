@@ -707,7 +707,7 @@ async function handleScheduleButton(interaction) {
       )
     }
 
-    await scheduleService.lockScheduleEvent({
+    const lockedEvent = await scheduleService.lockScheduleEvent({
       eventId,
       actorId: interaction.user.id,
       reason: "ล็อกจากปุ่มบนโพสต์ตารางนัด"
@@ -715,6 +715,19 @@ async function handleScheduleButton(interaction) {
 
     await refreshScheduleVoteMessage(interaction.client, eventId)
     await syncGuildScheduleBoard(interaction.client, event.guild_id)
+
+    const notifyChannel = interaction.channel?.isTextBased()
+      ? interaction.channel
+      : await fetchTextChannel(interaction.client, event.source_channel_id)
+
+    if (notifyChannel?.isTextBased()) {
+      await notifyChannel.send({
+        content: buildScheduleLockedNotice(lockedEvent, lockedEvent),
+        allowedMentions: lockedEvent.party_role_id
+          ? { roles: [lockedEvent.party_role_id] }
+          : undefined
+      }).catch(() => null)
+    }
 
     await interaction.editReply({
       content: `ล็อกตารางนัดเวลา #${eventId} เรียบร้อยแล้ว`
