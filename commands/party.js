@@ -517,6 +517,37 @@ module.exports = {
       return
     }
 
+    if (subcommand === "changeclass") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+
+      const classKey = interaction.options.getString("class")
+      const classOption = getClassOption(classKey)
+      const currentParty = await partyService.getPartyByChannelId(interaction.channelId).catch(() => null)
+
+      if (!currentParty) {
+        throw new ServiceError(
+          "ไม่พบปาร์ตี้ในห้องนี้",
+          "PARTY_NOT_FOUND",
+          { channelId: interaction.channelId }
+        )
+      }
+
+      await partyService.updatePartyMemberClass({
+        partyId: currentParty.id,
+        userId: interaction.user.id,
+        classKey,
+        classLabel: classOption?.label || classKey
+      })
+
+      await refreshPartyRecruitmentMessage(interaction.client, currentParty.id)
+
+      await interaction.editReply({
+        content: `เปลี่ยนอาชีพในปาร์ตี้ #${currentParty.id} เป็น ${classOption?.label || classKey} เรียบร้อยแล้ว`
+      })
+
+      return
+    }
+
 
     if (subcommand === "close") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral })
