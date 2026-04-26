@@ -25,6 +25,10 @@ const {
   buildPartyEmbed,
   getClassOption
 } = require("../utils/partyUi")
+const {
+  formatError,
+  logComponentInteraction
+} = require("../utils/serverLogger")
 
 const activeButtonLocks = new Set()
 
@@ -753,8 +757,10 @@ async function handleScheduleButton(interaction) {
 
 async function handleComponentInteraction(interaction) {
   try {
+    logComponentInteraction(interaction, "start")
+
     if (interaction.isButton()) {
-      return await withButtonLock(interaction, async () => {
+      const handled = await withButtonLock(interaction, async () => {
         if (interaction.customId.startsWith("party:")) {
           return await handlePartyButton(interaction)
         }
@@ -765,14 +771,21 @@ async function handleComponentInteraction(interaction) {
 
         return false
       })
+
+      logComponentInteraction(interaction, handled ? "success" : "ignored")
+      return handled
     }
 
     if (interaction.isStringSelectMenu() && interaction.customId.startsWith("party:")) {
-      return await handlePartyClassSelect(interaction)
+      const handled = await handlePartyClassSelect(interaction)
+      logComponentInteraction(interaction, handled ? "success" : "ignored")
+      return handled
     }
 
+    logComponentInteraction(interaction, "ignored")
     return false
   } catch (error) {
+    logComponentInteraction(interaction, "error", `error:${formatError(error)}`)
     console.error(error)
     await replyWithError(interaction, error)
     return true

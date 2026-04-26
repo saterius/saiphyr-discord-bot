@@ -1,6 +1,10 @@
 const { MessageFlags } = require("discord.js")
 const { handleComponentInteraction } = require("./interactionHandlers")
 const ServiceError = require("../services/serviceError")
+const {
+  formatError,
+  logCommandInteraction
+} = require("../utils/serverLogger")
 
 function getErrorMessage(error) {
   if (error instanceof ServiceError) {
@@ -23,8 +27,11 @@ module.exports = {
     if (!command) return;
 
     try {
+      logCommandInteraction(interaction, "start")
       await command.execute(interaction, client)
+      logCommandInteraction(interaction, "success")
     } catch (error) {
+      logCommandInteraction(interaction, "error", `error:${formatError(error)}`)
       console.error(error)
       const content = getErrorMessage(error)
 
