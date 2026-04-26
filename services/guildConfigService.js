@@ -96,6 +96,20 @@ async function getCalChannelConfig(guildId) {
   )
 }
 
+async function getPartyAdminRoleConfig(guildId) {
+  requireValue(guildId, "guildId is required.")
+
+  return getOne(
+    db,
+    `
+      SELECT *
+      FROM guild_party_admin_role_configs
+      WHERE guild_id = ?
+    `,
+    [guildId]
+  )
+}
+
 async function setVoiceLobby({
   guildId,
   lobbyChannelId
@@ -291,6 +305,39 @@ async function setCalChannel({
   })
 }
 
+async function setPartyAdminRole({
+  guildId,
+  adminRoleId
+}) {
+  requireValue(guildId, "guildId is required.")
+  requireValue(adminRoleId, "adminRoleId is required.")
+
+  return withTransaction("write", async (tx) => {
+    await run(
+      tx,
+      `
+        INSERT INTO guild_party_admin_role_configs (guild_id, admin_role_id)
+        VALUES (?, ?)
+        ON CONFLICT (guild_id)
+        DO UPDATE SET
+          admin_role_id = excluded.admin_role_id,
+          updated_at = CURRENT_TIMESTAMP
+      `,
+      [guildId, adminRoleId]
+    )
+
+    return getOne(
+      tx,
+      `
+        SELECT *
+        FROM guild_party_admin_role_configs
+        WHERE guild_id = ?
+      `,
+      [guildId]
+    )
+  })
+}
+
 async function setScheduleBoardMessage({
   guildId,
   boardMessageId
@@ -330,10 +377,12 @@ module.exports = {
   getCalChannelConfig,
   getPartyChannelConfig,
   getPartyFinderConfig,
+  getPartyAdminRoleConfig,
   getScheduleBoardState,
   getScheduleConfig,
   getVoiceConfig,
   setCalChannel,
+  setPartyAdminRole,
   setPartyChannelCategory,
   setPartyFinderChannel,
   setScheduleBoardMessage,

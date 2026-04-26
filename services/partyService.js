@@ -921,7 +921,8 @@ async function respondPartyConfirmation({
 async function activatePartyNow({
   partyId,
   actorId,
-  reason = "activated_by_leader"
+  reason = "activated_by_leader",
+  allowNonLeader = false
 }) {
   requireValue(partyId, "partyId is required.")
   requireValue(actorId, "actorId is required.")
@@ -930,7 +931,7 @@ async function activatePartyNow({
     const party = await getPartyRecord(tx, partyId)
     ensurePartyOpenForRosterChanges(party)
 
-    if (party.leader_id !== actorId) {
+    if (!allowNonLeader && party.leader_id !== actorId) {
       throw new ServiceError(
         "หัวหน้าปาร์ตี้เท่านั้นที่เปิดปาร์ตี้ได้ทันที",
         "NOT_PARTY_LEADER",
@@ -1008,7 +1009,8 @@ async function activatePartyNow({
 
 async function closePartyRecruitment({
   partyId,
-  actorId
+  actorId,
+  allowNonLeader = false
 }) {
   requireValue(partyId, "partyId is required.")
   requireValue(actorId, "actorId is required.")
@@ -1017,7 +1019,7 @@ async function closePartyRecruitment({
     const party = await getPartyRecord(tx, partyId)
     ensurePartyOpenForRosterChanges(party)
 
-    if (party.leader_id !== actorId) {
+    if (!allowNonLeader && party.leader_id !== actorId) {
       throw new ServiceError(
         "หัวหน้าปาร์ตี้เท่านั้นที่จะปิดรับสมัครสมาชิกก่อนได้.",
         "NOT_PARTY_LEADER",
@@ -1053,7 +1055,8 @@ async function kickPartyMember({
   partyId,
   actorId,
   targetUserId,
-  reason = null
+  reason = null,
+  allowNonLeader = false
 }) {
   requireValue(partyId, "partyId is required.")
   requireValue(actorId, "actorId is required.")
@@ -1063,7 +1066,7 @@ async function kickPartyMember({
     const party = await getPartyRecord(tx, partyId)
     ensurePartyOpenForRosterChanges(party)
 
-    if (party.leader_id !== actorId) {
+    if (!allowNonLeader && party.leader_id !== actorId) {
       throw new ServiceError(
         "หัวหน้าปาร์ตี้เท่านั้นที่นำสมาชิกออกได้",
         "NOT_PARTY_LEADER",
@@ -1212,7 +1215,8 @@ async function replacePartyMember({
   newUserId,
   classKey,
   classLabel = null,
-  reason = "member_changed"
+  reason = "member_changed",
+  allowNonLeader = false
 }) {
   requireValue(partyId, "partyId is required.")
   requireValue(actorId, "actorId is required.")
@@ -1232,7 +1236,7 @@ async function replacePartyMember({
     const party = await getPartyRecord(tx, partyId)
     ensurePartyOpenForRosterChanges(party)
 
-    if (party.leader_id !== actorId) {
+    if (!allowNonLeader && party.leader_id !== actorId) {
       throw new ServiceError(
         "หัวหน้าปาร์ตี้เท่านั้นที่เปลี่ยนสมาชิกได้",
         "NOT_PARTY_LEADER",
@@ -1414,7 +1418,8 @@ async function addPartyMember({
   userId,
   classKey,
   classLabel = null,
-  reason = "member_added_by_leader"
+  reason = "member_added_by_leader",
+  allowNonLeader = false
 }) {
   requireValue(partyId, "partyId is required.")
   requireValue(actorId, "actorId is required.")
@@ -1425,7 +1430,7 @@ async function addPartyMember({
     const party = await getPartyRecord(tx, partyId)
     ensurePartyOpenForRosterChanges(party)
 
-    if (party.leader_id !== actorId) {
+    if (!allowNonLeader && party.leader_id !== actorId) {
       throw new ServiceError(
         "หัวหน้าปาร์ตี้เท่านั้นที่เพิ่มสมาชิกได้",
         "NOT_PARTY_LEADER",

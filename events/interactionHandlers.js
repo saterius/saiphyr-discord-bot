@@ -29,6 +29,7 @@ const {
   formatError,
   logComponentInteraction
 } = require("../utils/serverLogger")
+const { memberHasPartyAdminRole } = require("../utils/partyAdminAuth")
 
 const activeButtonLocks = new Set()
 
@@ -398,7 +399,8 @@ async function handlePartyButton(interaction) {
 
     const result = await partyService.closePartyRecruitment({
       partyId,
-      actorId: interaction.user.id
+      actorId: interaction.user.id,
+      allowNonLeader: await memberHasPartyAdminRole(interaction)
     })
 
     await refreshPartyRecruitmentMessage(interaction.client, partyId)
@@ -421,7 +423,8 @@ async function handlePartyButton(interaction) {
     await partyService.activatePartyNow({
       partyId,
       actorId: interaction.user.id,
-      reason: "เปิดปาร์ตี้ทันทีจากโพสต์รับสมาชิก"
+      reason: "เปิดปาร์ตี้ทันทีจากโพสต์รับสมาชิก",
+      allowNonLeader: await memberHasPartyAdminRole(interaction)
     })
 
     await provisionPartyAndAnnounce(interaction.client, partyId)
@@ -442,8 +445,9 @@ async function handlePartyButton(interaction) {
     })
 
     const party = await partyService.getPartyById(partyId)
+    const allowAdminBypass = await memberHasPartyAdminRole(interaction)
 
-    if (party.leader_id !== interaction.user.id) {
+    if (!allowAdminBypass && party.leader_id !== interaction.user.id) {
       throw new ServiceError(
         "หัวหน้าปาร์ตี้เท่านั้นที่ยกเลิกปาร์ตี้ได้",
         "NOT_PARTY_LEADER",
@@ -468,7 +472,8 @@ async function handlePartyButton(interaction) {
       partyId,
       actorId: interaction.user.id,
       status: "cancelled",
-      reason: "ถูกยกเลิกจากโพสต์รับสมาชิก"
+      reason: "ถูกยกเลิกจากโพสต์รับสมาชิก",
+      allowNonLeader: await memberHasPartyAdminRole(interaction)
     })
 
     await refreshPartyRecruitmentMessage(interaction.client, partyId)
@@ -498,8 +503,9 @@ async function handlePartyButton(interaction) {
     await interaction.deferUpdate()
 
     const party = await partyService.getPartyById(partyId)
+    const allowAdminBypass = await memberHasPartyAdminRole(interaction)
 
-    if (party.leader_id !== interaction.user.id) {
+    if (!allowAdminBypass && party.leader_id !== interaction.user.id) {
       throw new ServiceError(
         "หัวหน้าปาร์ตี้เท่านั้นที่ยุบปาร์ตี้ได้",
         "NOT_PARTY_LEADER",
@@ -511,7 +517,8 @@ async function handlePartyButton(interaction) {
       guild: interaction.guild,
       partyId,
       actorId: interaction.user.id,
-      reason: "ยุบปาร์ตี้จาก /party close"
+      reason: "ยุบปาร์ตี้จาก /party close",
+      allowNonLeader: allowAdminBypass
     })
 
     await refreshPartyRecruitmentMessage(interaction.client, partyId)
@@ -612,8 +619,9 @@ async function handleScheduleButton(interaction) {
     })
 
     const event = await scheduleService.getScheduleEventById(eventId)
+    const allowAdminBypass = await memberHasPartyAdminRole(interaction)
 
-    if (event.leader_id !== interaction.user.id) {
+    if (!allowAdminBypass && event.leader_id !== interaction.user.id) {
       throw new ServiceError(
         "หัวหน้าปาร์ตี้เท่านั้นที่เสร็จสิ้นตารางนัดเวลาได้",
         "NOT_PARTY_LEADER",
@@ -626,7 +634,8 @@ async function handleScheduleButton(interaction) {
       actorId: interaction.user.id,
       reason: isPromptMessage
         ? "เสร็จสิ้นจากปุ่มแจ้งเตือนหลังเลยเวลานัด"
-        : "เสร็จสิ้นจากปุ่มบนโพสต์ตารางนัด"
+        : "เสร็จสิ้นจากปุ่มบนโพสต์ตารางนัด",
+      allowNonLeader: allowAdminBypass
     })
 
     const party = await partyService.getPartyById(event.party_id)
@@ -673,7 +682,8 @@ async function handleScheduleButton(interaction) {
       actorId: interaction.user.id,
       reason: isPromptMessage
         ? "ยกเลิกจากปุ่มแจ้งเตือนหลังเลยเวลานัด"
-        : "ยกเลิกจากปุ่มบนโพสต์ตารางนัด"
+        : "ยกเลิกจากปุ่มบนโพสต์ตารางนัด",
+      allowNonManager: await memberHasPartyAdminRole(interaction)
     })
 
     await refreshScheduleVoteMessage(interaction.client, eventId)
@@ -699,8 +709,9 @@ async function handleScheduleButton(interaction) {
     })
 
     const event = await scheduleService.getScheduleEventById(eventId)
+    const allowAdminBypass = await memberHasPartyAdminRole(interaction)
 
-    if (event.leader_id !== interaction.user.id && event.creator_id !== interaction.user.id) {
+    if (!allowAdminBypass && event.leader_id !== interaction.user.id && event.creator_id !== interaction.user.id) {
       throw new ServiceError(
         "หัวหน้าปาร์ตี้หรือคนที่สร้างตารางนัดนี้เท่านั้นที่ล็อกตารางได้",
         "NOT_SCHEDULE_MANAGER",
@@ -711,7 +722,8 @@ async function handleScheduleButton(interaction) {
     const lockedEvent = await scheduleService.lockScheduleEvent({
       eventId,
       actorId: interaction.user.id,
-      reason: "ล็อกจากปุ่มบนโพสต์ตารางนัด"
+      reason: "ล็อกจากปุ่มบนโพสต์ตารางนัด",
+      allowNonManager: allowAdminBypass
     })
 
     await refreshScheduleVoteMessage(interaction.client, eventId)

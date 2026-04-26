@@ -34,6 +34,7 @@ const {
 } = require("../utils/partyUi")
 const dragonNestClasses = require("../data/dragonNestClasses")
 const { parseBangkokDateTimeRange } = require("../utils/dateTimeRange")
+const { memberHasPartyAdminRole } = require("../utils/partyAdminAuth")
 
 function formatPartyType(type) {
   return type === PARTY_TYPE.STATIC ? "ประจำ" : "เฉพาะกิจ"
@@ -523,6 +524,7 @@ module.exports = {
       const classKey = interaction.options.getString("class")
       const classOption = getClassOption(classKey)
       const currentParty = await partyService.getPartyByChannelId(interaction.channelId).catch(() => null)
+      const allowAdminBypass = await memberHasPartyAdminRole(interaction)
 
       if (!currentParty) {
         throw new ServiceError(
@@ -562,7 +564,7 @@ module.exports = {
         )
       }
 
-      if (currentParty.leader_id !== interaction.user.id) {
+      if (!allowAdminBypass && currentParty.leader_id !== interaction.user.id) {
         throw new ServiceError(
           "หัวหน้าปาร์ตี้เท่านั้นที่ยุบปาร์ตี้ได้",
           "NOT_PARTY_LEADER",

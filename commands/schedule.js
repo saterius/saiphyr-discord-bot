@@ -16,6 +16,7 @@ const {
   buildScheduleEmbed
 } = require("../utils/partyUi")
 const { parseBangkokDateTimeRange } = require("../utils/dateTimeRange")
+const { memberHasPartyAdminRole } = require("../utils/partyAdminAuth")
 
 async function fetchTextChannel(client, channelId) {
   if (!channelId || !client?.channels?.fetch) {
@@ -212,7 +213,8 @@ module.exports = {
       await scheduleService.cancelScheduleEvent({
         eventId: event.id,
         actorId: interaction.user.id,
-        reason
+        reason,
+        allowNonManager: await memberHasPartyAdminRole(interaction)
       })
 
       await refreshScheduleVoteMessage(interaction.client, event.id)
