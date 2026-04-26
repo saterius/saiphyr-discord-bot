@@ -523,11 +523,7 @@ async function handlePartyButton(interaction) {
     }
 
     const extra = deletedBits.length ? ` (${deletedBits.join(", ")})` : ""
-
-    await interaction.editReply({
-      content: `ปาร์ตี้ #${partyId} ถูกยุบแล้ว${extra}`,
-      components: []
-    })
+    console.log(`Party #${partyId} closed by ${interaction.user.id}${extra}`)
 
     return true
   }
