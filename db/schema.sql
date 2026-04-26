@@ -12,6 +12,7 @@
 -- 18_guild_party_channel_configs.sql
 -- 19_guild_party_finder_configs.sql
 -- 21_guild_party_cal_configs.sql
+-- 22_guild_party_admin_role_configs.sql
 -- 20_party_members.sql
 -- 30_party_confirmations.sql
 -- 40_schedule_events.sql
@@ -26,6 +27,7 @@
 -- 99_guild_party_channel_triggers.sql
 -- 100_guild_party_finder_triggers.sql
 -- 101_guild_party_cal_triggers.sql
+-- 102_guild_party_admin_role_triggers.sql
 -- 98_schedule_event_times_triggers.sql
 --
 -- Keeping the schema split by concern makes it easier to review and maintain.

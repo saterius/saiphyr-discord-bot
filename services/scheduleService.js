@@ -587,7 +587,8 @@ async function voteOnSchedule({
 async function cancelScheduleEvent({
   eventId,
   actorId,
-  reason = "Cancelled manually."
+  reason = "Cancelled manually.",
+  allowNonManager = false
 }) {
   requireValue(eventId, "eventId is required.")
   requireValue(actorId, "actorId is required.")
@@ -596,7 +597,7 @@ async function cancelScheduleEvent({
     const event = await getScheduleEventRecord(tx, eventId)
     const party = await getPartyForScheduling(tx, event.party_id)
 
-    if (event.creator_id !== actorId && party.leader_id !== actorId) {
+    if (!allowNonManager && event.creator_id !== actorId && party.leader_id !== actorId) {
       throw new ServiceError(
         "หัวหน้าปาร์ตี้หรือคนที่สร้างตารางนัดนี้เท่านั้นที่ยกเลิกได้",
         "NOT_SCHEDULE_MANAGER",
@@ -637,7 +638,8 @@ async function cancelScheduleEvent({
 async function lockScheduleEvent({
   eventId,
   actorId,
-  reason = "Locked manually."
+  reason = "Locked manually.",
+  allowNonManager = false
 }) {
   requireValue(eventId, "eventId is required.")
   requireValue(actorId, "actorId is required.")
@@ -646,7 +648,7 @@ async function lockScheduleEvent({
     const event = await getScheduleEventRecord(tx, eventId)
     const party = await getPartyForScheduling(tx, event.party_id)
 
-    if (party.leader_id !== actorId && event.creator_id !== actorId) {
+    if (!allowNonManager && party.leader_id !== actorId && event.creator_id !== actorId) {
       throw new ServiceError(
         "หัวหน้าปาร์ตี้หรือคนที่สร้างตารางนัดนี้เท่านั้นที่ล็อกตารางได้",
         "NOT_SCHEDULE_MANAGER",
