@@ -158,7 +158,7 @@ module.exports = {
     .addSubcommand((subcommand) =>
       subcommand
         .setName("import")
-        .setDescription("ผูกปาร์ตี้เดิมที่มี role และห้องอยู่แล้วเข้ากับระบบ")
+        .setDescription("ผูกปาร์ตี้เดิมที่มียศและห้องอยู่แล้วเข้ากับระบบ")
         .addStringOption((option) =>
           option
             .setName("party_name")
@@ -259,7 +259,7 @@ module.exports = {
         .addIntegerOption((option) =>
           option
             .setName("party_id")
-            .setDescription("Party ID")
+            .setDescription("รหัสปาร์ตี้")
             .setRequired(true)
         )
         .addUserOption((option) =>
@@ -277,23 +277,23 @@ module.exports = {
     .addSubcommand((subcommand) =>
       subcommand
         .setName("memberchange")
-        .setDescription("Change one party member to another member")
+        .setDescription("เปลี่ยนสมาชิกในปาร์ตี้เป็นสมาชิกคนใหม่")
         .addUserOption((option) =>
           option
             .setName("old_member")
-            .setDescription("Current party member to replace")
+            .setDescription("สมาชิกปัจจุบันที่ต้องการเปลี่ยนออก")
             .setRequired(true)
         )
         .addUserOption((option) =>
           option
             .setName("new_member")
-            .setDescription("New member to add")
+            .setDescription("สมาชิกใหม่ที่ต้องการเพิ่ม")
             .setRequired(true)
         )
         .addStringOption((option) =>
           option
             .setName("class")
-            .setDescription("Class for the new member")
+            .setDescription("อาชีพของสมาชิกใหม่")
             .setRequired(true)
             .addChoices(
               ...dragonNestClasses.map((job) => ({
@@ -306,17 +306,17 @@ module.exports = {
     .addSubcommand((subcommand) =>
       subcommand
         .setName("addmember")
-        .setDescription("Add a member to the active party in this channel")
+        .setDescription("เพิ่มสมาชิกเข้าปาร์ตี้ที่ใช้งานอยู่ในห้องนี้")
         .addUserOption((option) =>
           option
             .setName("member")
-            .setDescription("Member to add")
+            .setDescription("สมาชิกที่ต้องการเพิ่ม")
             .setRequired(true)
         )
         .addStringOption((option) =>
           option
             .setName("class")
-            .setDescription("Class for the member")
+            .setDescription("อาชีพของสมาชิก")
             .setRequired(true)
             .addChoices(
               ...dragonNestClasses.map((job) => ({
@@ -329,11 +329,11 @@ module.exports = {
     .addSubcommand((subcommand) =>
       subcommand
         .setName("changeclass")
-        .setDescription("Change your class in this party channel")
+        .setDescription("เปลี่ยนอาชีพของคุณในห้องปาร์ตี้นี้")
         .addStringOption((option) =>
           option
             .setName("class")
-            .setDescription("Your new class")
+            .setDescription("อาชีพใหม่ของคุณ")
             .setRequired(true)
             .addChoices(
               ...dragonNestClasses.map((job) => ({
@@ -346,7 +346,7 @@ module.exports = {
     .addSubcommand((subcommand) =>
       subcommand
         .setName("close")
-        .setDescription("Close/disband the active party in this channel")
+        .setDescription("ปิดหรือยุบปาร์ตี้ที่ใช้งานอยู่ในห้องนี้")
     )
     .addSubcommand((subcommand) =>
       subcommand
