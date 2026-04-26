@@ -671,15 +671,7 @@ function buildScheduleLockedNotice(event, party = null) {
   const roleMention = party?.party_role_id
     ? `<@&${party.party_role_id}>`
     : (party?.party_name || party?.name || "ตารางเวลาของคุณ")
-  const startLabel = formatScheduleLockedDateTime(event.start_at_unix, event.timezone)
-  const endLabel = event.end_at_unix
-    ? ` - ${formatScheduleLockedTime(event.end_at_unix, event.timezone)}`
-    : ""
-  const relativeLabel = Number.isFinite(Number(event.start_at_unix))
-    ? ` (${renderDiscordTimestamp(event.start_at_unix, "R")})`
-    : ""
-
-  return `${roleMention} ตารางเวลาของคุณคือ ${startLabel}${endLabel}${relativeLabel}`
+  return `${roleMention} ตารางเวลาของคุณคือ ${renderScheduleWindow(event)}`
 }
 
 function buildScheduleCancelledNotice(event) {
