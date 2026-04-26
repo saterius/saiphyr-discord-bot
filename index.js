@@ -23,13 +23,27 @@ const client = new Client({
 loadCommands(client)
 loadEvents(client)
 
-client.once("ready", async () => {
+client.once("clientReady", async () => {
   console.log(`Logged in as ${client.user.tag}`)
 
   await deployCommands()
   startScheduleReminderLoop(client)
   startDailyPartyRecruitmentRepostLoop(client)
   startMonthlyRoleMentionLoop(client)
+})
+
+async function shutdown(signal) {
+  console.log(`Received ${signal}, shutting down...`)
+  client.destroy()
+  process.exit(0)
+}
+
+process.once("SIGTERM", () => {
+  void shutdown("SIGTERM")
+})
+
+process.once("SIGINT", () => {
+  void shutdown("SIGINT")
 })
 
 client.login(process.env.TOKEN)
