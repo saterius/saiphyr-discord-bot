@@ -524,7 +524,6 @@ module.exports = {
       const classKey = interaction.options.getString("class")
       const classOption = getClassOption(classKey)
       const currentParty = await partyService.getPartyByChannelId(interaction.channelId).catch(() => null)
-      const allowAdminBypass = await memberHasPartyAdminRole(interaction)
 
       if (!currentParty) {
         throw new ServiceError(
@@ -555,6 +554,7 @@ module.exports = {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral })
 
       const currentParty = await partyService.getPartyByChannelId(interaction.channelId).catch(() => null)
+      const allowAdminBypass = await memberHasPartyAdminRole(interaction)
 
       if (!currentParty) {
         throw new ServiceError(
