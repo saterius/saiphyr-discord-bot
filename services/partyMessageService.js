@@ -244,6 +244,26 @@ async function postLockedScheduleBoardEntry(client, eventId) {
   return syncGuildScheduleBoard(client, event.guild_id, event.board_channel_id)
 }
 
+async function announceLockedSchedule(client, eventId, fallbackChannel = null) {
+  const event = await scheduleService.getScheduleEventById(eventId)
+  const channel = await fetchTextChannel(
+    client,
+    event.source_channel_id || event.party_channel_id,
+    fallbackChannel
+  )
+
+  if (!channel || !channel.isTextBased()) {
+    return null
+  }
+
+  return channel.send({
+    content: buildScheduleLockedNotice(event, event),
+    allowedMentions: event.party_role_id
+      ? { roles: [event.party_role_id] }
+      : undefined
+  }).catch(() => null)
+}
+
 async function syncGuildScheduleBoard(client, guildId, explicitBoardChannelId = null) {
   const scheduleConfig = explicitBoardChannelId
     ? { board_channel_id: explicitBoardChannelId }
@@ -356,6 +376,7 @@ async function sendScheduleCompletionSuggestion(client, event, fallbackChannel =
 module.exports = {
   announceCancelledSchedule,
   postLockedScheduleBoardEntry,
+  announceLockedSchedule,
   provisionPartyAndAnnounce,
   clearPartyConfirmationPrompt,
   refreshPartyRecruitmentMessage,

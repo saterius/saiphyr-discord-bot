@@ -8,6 +8,7 @@ const { markPartyChannelCleared } = require("../services/partyProvisioningServic
 const ServiceError = require("../services/serviceError")
 const {
   announceCancelledSchedule,
+  announceLockedSchedule,
   postLockedScheduleBoardEntry,
   provisionPartyAndAnnounce,
   refreshPartyRecruitmentMessage,
@@ -715,19 +716,7 @@ async function handleScheduleButton(interaction) {
 
     await refreshScheduleVoteMessage(interaction.client, eventId)
     await syncGuildScheduleBoard(interaction.client, event.guild_id)
-
-    const notifyChannel = interaction.channel?.isTextBased()
-      ? interaction.channel
-      : await fetchTextChannel(interaction.client, event.source_channel_id)
-
-    if (notifyChannel?.isTextBased()) {
-      await notifyChannel.send({
-        content: buildScheduleLockedNotice(lockedEvent, lockedEvent),
-        allowedMentions: lockedEvent.party_role_id
-          ? { roles: [lockedEvent.party_role_id] }
-          : undefined
-      }).catch(() => null)
-    }
+    await announceLockedSchedule(interaction.client, eventId, interaction.channel)
 
     await interaction.editReply({
       content: `ล็อกตารางนัดเวลา #${eventId} เรียบร้อยแล้ว`
@@ -754,6 +743,7 @@ async function handleScheduleButton(interaction) {
 
   if (result.locked) {
     await postLockedScheduleBoardEntry(interaction.client, eventId)
+    await announceLockedSchedule(interaction.client, eventId, interaction.channel)
   } else if (result.cancelled) {
     await announceCancelledSchedule(interaction.client, eventId)
   }
