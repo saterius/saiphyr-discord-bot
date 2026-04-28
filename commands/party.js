@@ -113,6 +113,28 @@ async function syncPartyRoleForAddedMember(interaction, party, userId) {
   return true
 }
 
+async function syncPartyRoleForRemovedMember(interaction, party, userId) {
+  if (!interaction.guild || !party?.party_role_id) {
+    return false
+  }
+
+  const role = interaction.guild.roles.cache.get(party.party_role_id)
+    || await interaction.guild.roles.fetch(party.party_role_id).catch(() => null)
+
+  if (!role) {
+    return false
+  }
+
+  const guildMember = await interaction.guild.members.fetch(userId).catch(() => null)
+  if (!guildMember) {
+    return false
+  }
+
+  await guildMember.roles.remove(role, `Removed from party ${party.id}`).catch(() => null)
+
+  return true
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("party")
@@ -518,6 +540,76 @@ module.exports = {
       return
     }
 
+    if (subcommand === "kick") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+
+      const partyId = interaction.options.getInteger("party_id")
+      const member = interaction.options.getUser("member")
+      const reason = interaction.options.getString("reason")
+      const allowAdminBypass = await memberHasPartyAdminRole(interaction)
+
+      const result = await partyService.kickPartyMember({
+        partyId,
+        actorId: interaction.user.id,
+        targetUserId: member.id,
+        reason: reason || "kicked_via_command",
+        allowNonLeader: allowAdminBypass
+      })
+
+      await syncPartyRoleForRemovedMember(interaction, result.party, member.id)
+      await refreshPartyRecruitmentMessage(interaction.client, partyId)
+      await syncGuildScheduleBoard(interaction.client, interaction.guildId).catch(() => null)
+
+      await interaction.editReply({
+        content: result.reopenedRecruitment
+          ? `นำ ${member} ออกจากปาร์ตี้ #${partyId} แล้ว และระบบกลับมาเปิดรับสมาชิกอีกครั้ง`
+          : `นำ ${member} ออกจากปาร์ตี้ #${partyId} เรียบร้อยแล้ว`
+      })
+
+      return
+    }
+
+    if (subcommand === "memberchange") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+
+      const oldMember = interaction.options.getUser("old_member")
+      const newMember = interaction.options.getUser("new_member")
+      const classKey = interaction.options.getString("class")
+      const classOption = getClassOption(classKey)
+      const currentParty = await partyService.getPartyByChannelId(interaction.channelId).catch(() => null)
+      const allowAdminBypass = await memberHasPartyAdminRole(interaction)
+
+      if (!currentParty) {
+        throw new ServiceError(
+          "ไม่พบปาร์ตี้ในห้องนี้",
+          "PARTY_NOT_FOUND",
+          { channelId: interaction.channelId }
+        )
+      }
+
+      const result = await partyService.replacePartyMember({
+        partyId: currentParty.id,
+        actorId: interaction.user.id,
+        oldUserId: oldMember.id,
+        newUserId: newMember.id,
+        classKey,
+        classLabel: classOption?.label || classKey,
+        reason: "member_changed_via_command",
+        allowNonLeader: allowAdminBypass
+      })
+
+      await syncPartyRoleForMemberChange(interaction, result.party, oldMember.id, newMember.id)
+      await refreshPartyRecruitmentMessage(interaction.client, currentParty.id)
+      await sendPartyConfirmationPrompt(interaction.client, currentParty.id)
+      await syncGuildScheduleBoard(interaction.client, interaction.guildId).catch(() => null)
+
+      await interaction.editReply({
+        content: `เปลี่ยนสมาชิกในปาร์ตี้ #${currentParty.id} จาก ${oldMember} เป็น ${newMember} (${classOption?.label || classKey}) เรียบร้อยแล้ว`
+      })
+
+      return
+    }
+
     if (subcommand === "changeclass") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral })
 
@@ -544,6 +636,43 @@ module.exports = {
 
       await interaction.editReply({
         content: `เปลี่ยนอาชีพในปาร์ตี้ #${currentParty.id} เป็น ${classOption?.label || classKey} เรียบร้อยแล้ว`
+      })
+
+      return
+    }
+
+    if (subcommand === "addmember") {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+
+      const member = interaction.options.getUser("member")
+      const classKey = interaction.options.getString("class")
+      const classOption = getClassOption(classKey)
+      const currentParty = await partyService.getPartyByChannelId(interaction.channelId).catch(() => null)
+      const allowAdminBypass = await memberHasPartyAdminRole(interaction)
+
+      if (!currentParty) {
+        throw new ServiceError(
+          "ไม่พบปาร์ตี้ในห้องนี้",
+          "PARTY_NOT_FOUND",
+          { channelId: interaction.channelId }
+        )
+      }
+
+      const result = await partyService.addPartyMember({
+        partyId: currentParty.id,
+        actorId: interaction.user.id,
+        userId: member.id,
+        classKey,
+        classLabel: classOption?.label || classKey,
+        allowNonLeader: allowAdminBypass
+      })
+
+      await syncPartyRoleForAddedMember(interaction, result.party, member.id)
+      await refreshPartyRecruitmentMessage(interaction.client, currentParty.id)
+      await syncGuildScheduleBoard(interaction.client, interaction.guildId).catch(() => null)
+
+      await interaction.editReply({
+        content: `เพิ่ม ${member} เข้าปาร์ตี้ #${currentParty.id} เป็น ${classOption?.label || classKey} เรียบร้อยแล้ว`
       })
 
       return
