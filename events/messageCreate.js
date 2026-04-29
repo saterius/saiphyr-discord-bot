@@ -14,6 +14,11 @@ module.exports = {
   async execute(message) {
     if (message.author.bot) return;
 
+    if (!message.inGuild()) {
+      await message.reply("นี่เป็นบอท ไม่รู้ว่าคุณทักถูกคนรึเปล่า");
+      return;
+    }
+
     const content = message.content.trim();
     if (!triggers.has(content)) return;
 
