@@ -3,57 +3,52 @@ const { ActivityType } = require("discord.js")
 const ACTIVITY_CHANGE_INTERVAL_MS = 10 * 60 * 1000
 const DEFAULT_STREAM_URL = "https://www.twitch.tv/discord"
 
-const ACTIVITY_ROTATION = [
-  {
-    name: "กำลังหลับ",
-    type: ActivityType.Streaming,
-    url: DEFAULT_STREAM_URL
-  },
-  {
-    name: "กำลังหิว",
-    type: ActivityType.Watching
-  },
-  {
-    name: "กำลังคิด",
-    type: ActivityType.Listening
-  },
-  {
-    name: "กำลังคลั่ง",
-    type: ActivityType.Competing
-  },
-  {
-    name: "กำลังปวดหัว",
-    type: ActivityType.Playing
-  }
+const STATUS_ROTATION = [
+  "online",
+  "idle",
+  "dnd"
 ]
 
-function pickRandomActivity(previousIndex) {
-  if (ACTIVITY_ROTATION.length <= 1) {
-    return { activity: ACTIVITY_ROTATION[0], index: 0 }
-  }
+const ACTIVITY_TYPE_ROTATION = [
+  ActivityType.Streaming,
+  ActivityType.Watching,
+  ActivityType.Listening,
+  ActivityType.Competing,
+  ActivityType.Playing
+]
 
-  let index = previousIndex
-  while (index === previousIndex) {
-    index = Math.floor(Math.random() * ACTIVITY_ROTATION.length)
-  }
+const ACTIVITY_NAME_ROTATION = [
+  "กำลังหลับ",
+  "กำลังหิว",
+  "กำลังคิด",
+  "กำลังคลั่ง",
+  "กำลังปวดหัว"
+]
 
-  return { activity: ACTIVITY_ROTATION[index], index }
+function pickRandomItem(items) {
+  return items[Math.floor(Math.random() * items.length)]
 }
 
-function setRandomPresence(client, previousIndex = -1) {
-  const { activity, index } = pickRandomActivity(previousIndex)
-  const nextActivity = { ...activity }
-
-  if (nextActivity.type === ActivityType.Streaming && !nextActivity.url) {
-    nextActivity.url = DEFAULT_STREAM_URL
+function buildRandomPresence() {
+  const status = pickRandomItem(STATUS_ROTATION)
+  const type = pickRandomItem(ACTIVITY_TYPE_ROTATION)
+  const activity = {
+    name: pickRandomItem(ACTIVITY_NAME_ROTATION),
+    type
   }
 
-  client.user.setPresence({
-    status: "online",
-    activities: [nextActivity]
-  })
+  if (type === ActivityType.Streaming) {
+    activity.url = DEFAULT_STREAM_URL
+  }
 
-  return index
+  return {
+    status,
+    activities: [activity]
+  }
+}
+
+function setRandomPresence(client) {
+  client.user.setPresence(buildRandomPresence())
 }
 
 module.exports = {
@@ -63,10 +58,10 @@ module.exports = {
   execute(client) {
     console.log(`Logged in as ${client.user.tag}`)
 
-    let currentActivityIndex = setRandomPresence(client)
+    setRandomPresence(client)
 
     setInterval(() => {
-      currentActivityIndex = setRandomPresence(client, currentActivityIndex)
+      setRandomPresence(client)
     }, ACTIVITY_CHANGE_INTERVAL_MS)
   }
 }
