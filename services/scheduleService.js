@@ -84,6 +84,33 @@ async function getActivePartyMemberCount(executor, partyId) {
   return record?.memberCount || 0
 }
 
+async function reactivateStaticPartyIfNoOpenSchedules(executor, partyId) {
+  await run(
+    executor,
+    `
+      UPDATE parties
+      SET status = ?
+      WHERE id = ?
+        AND party_type = ?
+        AND status = ?
+        AND NOT EXISTS (
+          SELECT 1
+          FROM schedule_events se
+          WHERE se.party_id = parties.id
+            AND se.status IN (?, ?)
+        )
+    `,
+    [
+      PARTY_STATUS.ACTIVE,
+      partyId,
+      PARTY_TYPE.STATIC,
+      PARTY_STATUS.SCHEDULED,
+      SCHEDULE_STATUS.VOTING,
+      SCHEDULE_STATUS.LOCKED
+    ]
+  )
+}
+
 async function insertScheduleLog(executor, {
   partyId,
   actorId,
@@ -532,6 +559,8 @@ async function voteOnSchedule({
         meta: { vote, note }
       })
 
+      await reactivateStaticPartyIfNoOpenSchedules(tx, event.party_id)
+
       cancelled = true
     } else if (activeMemberCount > 0 && summary.acceptCount === activeMemberCount) {
       await run(
@@ -630,6 +659,8 @@ async function cancelScheduleEvent({
       scheduleEventId: eventId,
       meta: { reason }
     })
+
+    await reactivateStaticPartyIfNoOpenSchedules(tx, event.party_id)
 
     return loadScheduleEventDetails(tx, eventId)
   })
@@ -976,6 +1007,8 @@ async function autoCancelScheduleEvent({
       scheduleEventId: eventId,
       meta: { reason, cancelledAt }
     })
+
+    await reactivateStaticPartyIfNoOpenSchedules(tx, event.party_id)
 
     return loadScheduleEventDetails(tx, eventId)
   })

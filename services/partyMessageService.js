@@ -28,6 +28,7 @@ const {
 } = require("../utils/partyUi")
 const {
   createScheduleBoardImage,
+  expandScheduleBoardRange,
   filterScheduleBoardEntriesForRange,
   getCurrentScheduleBoardRange
 } = require("../utils/scheduleBoardImage")
@@ -280,14 +281,22 @@ async function syncGuildScheduleBoard(client, guildId, explicitBoardChannelId = 
 
   const entries = await scheduleService.listGuildScheduleBoardEntries(guildId)
   const imageEntries = await scheduleService.listGuildScheduleBoardImageEntries(guildId)
-  const boardRange = getCurrentScheduleBoardRange()
-  const unscheduledParties = await scheduleService.listGuildUnscheduledScheduleBoardParties(guildId, boardRange)
+  const currentWeekRange = getCurrentScheduleBoardRange()
+  const boardRange = expandScheduleBoardRange(currentWeekRange, 2)
+  const nextWeekRange = {
+    rangeStartUnix: currentWeekRange.rangeEndUnix,
+    rangeEndUnix: currentWeekRange.rangeEndUnix + (currentWeekRange.rangeEndUnix - currentWeekRange.rangeStartUnix)
+  }
+  const unscheduledPartiesByRange = await Promise.all([
+    scheduleService.listGuildUnscheduledScheduleBoardParties(guildId, currentWeekRange),
+    scheduleService.listGuildUnscheduledScheduleBoardParties(guildId, nextWeekRange)
+  ])
   const visibleEntries = filterScheduleBoardEntriesForRange(entries, boardRange)
   const visibleImageEntries = filterScheduleBoardEntriesForRange(imageEntries, boardRange)
   const embeds = buildScheduleBoardOverviewEmbeds(visibleEntries, guildId, { boardRange })
   const boardImage = await createScheduleBoardImage(visibleImageEntries, {
     range: boardRange,
-    unscheduledParties
+    unscheduledPartiesByRange
   })
   const files = boardImage
     ? [new AttachmentBuilder(boardImage.buffer, { name: boardImage.name })]
