@@ -33,11 +33,11 @@ async function finishParty({
   guild,
   partyId,
   actorId,
-  reason = "Party finished",
+  reason = "ปาร์ตี้เสร็จสิ้นแล้ว",
   allowNonLeader = false
 }) {
   if (!guild) {
-    throw new ServiceError("guild is required.", "VALIDATION_ERROR")
+    throw new ServiceError("ไม่พบข้อมูลเซิร์ฟเวอร์", "VALIDATION_ERROR")
   }
 
   const party = await partyService.getPartyById(partyId)
@@ -52,7 +52,7 @@ async function finishParty({
 
   if (party.guild_id !== guild.id) {
     throw new ServiceError(
-      "Party does not belong to this guild.",
+      "ปาร์ตี้นี้ไม่ได้อยู่ในเซิร์ฟเวอร์นี้",
       "PARTY_GUILD_MISMATCH",
       { partyId, guildId: guild.id }
     )

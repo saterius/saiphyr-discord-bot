@@ -455,7 +455,7 @@ function buildScheduleEmbed(event, party) {
     .join("\n") || "-"
 
   return new EmbedBuilder()
-    .setTitle("Schedule Vote")
+    .setTitle("โหวตตารางเวลา")
     .setDescription(event.description || `โหวตตารางนัดเวลาสำหรับปาร์ตี้ ${party.name}`)
     .setColor(
       event.status === SCHEDULE_STATUS.LOCKED
@@ -528,7 +528,7 @@ function buildScheduleBoardOverviewEmbeds(entries, guildId, { boardRange = null 
   if (!sortedEntries.length) {
     return [
       new EmbedBuilder()
-        .setTitle("Schedule Board")
+        .setTitle("ตารางนัดเวลา")
         .setDescription(
           rangeLine
             ? `ยังไม่มีการกำหนดตารางนัดเวลาสำหรับปาร์ตี้ในช่วง ${rangeLine}.`
@@ -545,7 +545,7 @@ function buildScheduleBoardOverviewEmbeds(entries, guildId, { boardRange = null 
 
   return chunks.map((chunk, index) => {
     const embed = new EmbedBuilder()
-      .setTitle(index === 0 ? "ตารางนัดเวลา" : `Schedule Board หน้า ${index + 1}`)
+      .setTitle(index === 0 ? "ตารางนัดเวลา" : `ตารางนัดเวลา หน้า ${index + 1}`)
       .setDescription(
         index === 0
           ? [

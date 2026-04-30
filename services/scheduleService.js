@@ -49,7 +49,7 @@ async function getPartyForScheduling(executor, partyId) {
   )
 
   if (!party) {
-    throw new ServiceError("Party not found.", "PARTY_NOT_FOUND", { partyId })
+    throw new ServiceError("ไม่พบปาร์ตี้นี้", "PARTY_NOT_FOUND", { partyId })
   }
 
   return party
@@ -160,7 +160,7 @@ async function getScheduleEventRecord(executor, eventId) {
   )
 
   if (!event) {
-    throw new ServiceError("Schedule event not found.", "SCHEDULE_NOT_FOUND", { eventId })
+    throw new ServiceError("ไม่พบตารางนัดเวลานี้", "SCHEDULE_NOT_FOUND", { eventId })
   }
 
   return event
@@ -229,7 +229,7 @@ async function createScheduleEvent({
 
     if (![PARTY_STATUS.ACTIVE, PARTY_STATUS.SCHEDULED].includes(party.status)) {
       throw new ServiceError(
-        "Party must be active before creating a schedule vote.",
+        "ปาร์ตี้ต้องอยู่ในสถานะใช้งานก่อนจึงจะสร้างโหวตตารางนัดเวลาได้",
         "PARTY_NOT_ACTIVE",
         { partyId, status: party.status }
       )
@@ -246,7 +246,7 @@ async function createScheduleEvent({
     const member = await getActivePartyMember(tx, partyId, creatorId)
     if (!member) {
       throw new ServiceError(
-        "Only active party members can create schedule votes.",
+        "เฉพาะสมาชิกที่ยังอยู่ในปาร์ตี้เท่านั้นที่สร้างโหวตตารางนัดเวลาได้",
         "NOT_PARTY_MEMBER",
         { partyId, creatorId }
       )
@@ -476,7 +476,7 @@ async function voteOnSchedule({
   requireValue(vote, "vote is required.")
 
   if (!Object.values(SCHEDULE_VOTE).includes(vote)) {
-    throw new ServiceError("Invalid schedule vote.", "VALIDATION_ERROR", { vote })
+    throw new ServiceError("ตัวเลือกโหวตตารางนัดเวลาไม่ถูกต้อง", "VALIDATION_ERROR", { vote })
   }
 
   return withTransaction("write", async (tx) => {
@@ -484,7 +484,7 @@ async function voteOnSchedule({
 
     if (event.status !== SCHEDULE_STATUS.VOTING) {
       throw new ServiceError(
-        "This schedule vote is no longer open.",
+        "โหวตตารางนัดเวลานี้ไม่ได้เปิดรับโหวตแล้ว",
         "SCHEDULE_NOT_VOTING",
         { eventId, status: event.status }
       )
@@ -493,7 +493,7 @@ async function voteOnSchedule({
     const member = await getActivePartyMember(tx, event.party_id, userId)
     if (!member) {
       throw new ServiceError(
-        "Only active party members can vote on this schedule.",
+        "เฉพาะสมาชิกที่ยังอยู่ในปาร์ตี้เท่านั้นที่โหวตตารางนัดเวลานี้ได้",
         "NOT_PARTY_MEMBER",
         { eventId, userId }
       )
@@ -616,7 +616,7 @@ async function voteOnSchedule({
 async function cancelScheduleEvent({
   eventId,
   actorId,
-  reason = "Cancelled manually.",
+  reason = "ยกเลิกด้วยตนเอง",
   allowNonManager = false
 }) {
   requireValue(eventId, "eventId is required.")
@@ -669,7 +669,7 @@ async function cancelScheduleEvent({
 async function lockScheduleEvent({
   eventId,
   actorId,
-  reason = "Locked manually.",
+  reason = "ล็อกด้วยตนเอง",
   allowNonManager = false
 }) {
   requireValue(eventId, "eventId is required.")
@@ -738,7 +738,7 @@ async function lockScheduleEvent({
 async function completeScheduleEvent({
   eventId,
   actorId,
-  reason = "Completed manually.",
+  reason = "เสร็จสิ้นด้วยตนเอง",
   allowNonLeader = false
 }) {
   requireValue(eventId, "eventId is required.")
@@ -750,7 +750,7 @@ async function completeScheduleEvent({
 
     if (!allowNonLeader && party.leader_id !== actorId) {
       throw new ServiceError(
-        "Only the party leader can complete a schedule event.",
+        "หัวหน้าปาร์ตี้เท่านั้นที่เสร็จสิ้นตารางนัดเวลาได้",
         "NOT_PARTY_LEADER",
         { eventId, actorId }
       )
@@ -762,7 +762,7 @@ async function completeScheduleEvent({
 
     if (event.status !== SCHEDULE_STATUS.LOCKED) {
       throw new ServiceError(
-        "Only locked schedules can be completed.",
+        "เสร็จสิ้นได้เฉพาะตารางนัดเวลาที่ล็อกแล้วเท่านั้น",
         "SCHEDULE_NOT_LOCKED",
         { eventId, status: event.status }
       )
@@ -975,7 +975,7 @@ async function listLockedScheduleEventsPastStart({
 
 async function autoCancelScheduleEvent({
   eventId,
-  reason = "Schedule expired before every member accepted."
+  reason = "ตารางนัดเวลาหมดเวลาก่อนที่สมาชิกทุกคนจะกดยืนยัน"
 }) {
   requireValue(eventId, "eventId is required.")
 
@@ -1044,7 +1044,7 @@ async function listGuildScheduleEntriesByStatuses(guildId, statuses) {
   requireValue(guildId, "guildId is required.")
 
   if (!Array.isArray(statuses) || !statuses.length) {
-    throw new ServiceError("At least one schedule status is required.", "VALIDATION_ERROR")
+    throw new ServiceError("ต้องระบุสถานะตารางนัดเวลาอย่างน้อย 1 สถานะ", "VALIDATION_ERROR")
   }
 
   const statusPlaceholders = statuses.map(() => "?").join(", ")

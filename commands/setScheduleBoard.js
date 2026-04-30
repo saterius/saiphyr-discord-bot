@@ -9,11 +9,11 @@ const { setScheduleBoard } = require("../services/guildConfigService");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("setscheduleboard")
-    .setDescription("Set the default schedule board channel for this guild")
+    .setDescription("ตั้งช่องบอร์ดตารางเวลาหลักของเซิร์ฟเวอร์นี้")
     .addChannelOption(option =>
       option
         .setName("channel")
-        .setDescription("Text channel to use as the schedule board")
+        .setDescription("ช่องข้อความที่จะใช้เป็นบอร์ดตารางเวลา")
         .addChannelTypes(ChannelType.GuildText)
         .setRequired(true)
     )
@@ -28,7 +28,7 @@ module.exports = {
     });
 
     await interaction.reply({
-      content: `Default schedule board saved for this guild: ${channel}`,
+      content: `บันทึกช่องบอร์ดตารางเวลาของเซิร์ฟเวอร์นี้แล้ว: ${channel}`,
       flags: MessageFlags.Ephemeral
     });
   }

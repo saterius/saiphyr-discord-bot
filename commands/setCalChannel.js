@@ -10,11 +10,11 @@ const { setCalChannel } = require("../services/guildConfigService")
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("setcalchannel")
-    .setDescription("Set the text channel used for /party cal in this guild")
+    .setDescription("ตั้งช่องข้อความสำหรับใช้ /party cal ในเซิร์ฟเวอร์นี้")
     .addChannelOption((option) =>
       option
         .setName("channel")
-        .setDescription("Text channel used for party calculation summaries")
+        .setDescription("ช่องข้อความสำหรับโพสต์สรุปยอดคำนวณปาร์ตี้")
         .addChannelTypes(ChannelType.GuildText)
         .setRequired(true)
     )
@@ -29,7 +29,7 @@ module.exports = {
     })
 
     await interaction.reply({
-      content: `Default party calculation channel saved for this guild: ${channel}`,
+      content: `บันทึกช่องสรุปยอดคำนวณปาร์ตี้ของเซิร์ฟเวอร์นี้แล้ว: ${channel}`,
       flags: MessageFlags.Ephemeral
     })
   }
