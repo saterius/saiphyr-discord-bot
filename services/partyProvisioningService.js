@@ -69,7 +69,7 @@ async function resolveTextChannel(guild, party, role, {
     name: channelName || defaultChannelName(party),
     type: ChannelType.GuildText,
     parent: parentId,
-    topic: topic || `Private party room for ${party.name}`,
+    topic: topic || `ห้องส่วนตัวสำหรับปาร์ตี้ ${party.name}`,
     permissionOverwrites: [
       {
         id: guild.roles.everyone.id,
@@ -116,7 +116,7 @@ async function assignPartyRole(guild, party, role) {
 
 async function markPartyChannelCleared(guild, partyId) {
   if (!guild) {
-    throw new ServiceError("guild is required.", "VALIDATION_ERROR")
+    throw new ServiceError("ไม่พบข้อมูลเซิร์ฟเวอร์", "VALIDATION_ERROR")
   }
 
   const party = await partyService.getPartyById(partyId)
@@ -144,7 +144,7 @@ async function markPartyChannelCleared(guild, partyId) {
 
 async function clearPartyChannelClearedMark(guild, partyId) {
   if (!guild) {
-    throw new ServiceError("guild is required.", "VALIDATION_ERROR")
+    throw new ServiceError("ไม่พบข้อมูลเซิร์ฟเวอร์", "VALIDATION_ERROR")
   }
 
   const party = await partyService.getPartyById(partyId)
@@ -172,14 +172,14 @@ async function clearPartyChannelClearedMark(guild, partyId) {
 
 async function provisionPartyResources(guild, partyId, options = {}) {
   if (!guild) {
-    throw new ServiceError("guild is required.", "VALIDATION_ERROR")
+    throw new ServiceError("ไม่พบข้อมูลเซิร์ฟเวอร์", "VALIDATION_ERROR")
   }
 
   const party = await partyService.getPartyById(partyId)
 
   if (![PARTY_STATUS.ACTIVE, PARTY_STATUS.SCHEDULED].includes(party.status)) {
     throw new ServiceError(
-      "Party must be active before provisioning Discord resources.",
+      "ปาร์ตี้ต้องอยู่ในสถานะใช้งานก่อนจึงจะสร้างยศและห้อง Discord ได้",
       "PARTY_NOT_ACTIVE",
       { partyId, status: party.status }
     )

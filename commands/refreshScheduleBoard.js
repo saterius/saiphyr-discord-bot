@@ -11,7 +11,7 @@ const ServiceError = require("../services/serviceError")
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("refreshscheduleboard")
-    .setDescription("Refresh the central schedule board message")
+    .setDescription("รีเฟรชข้อความบอร์ดตารางเวลาหลัก")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction, client) {
@@ -21,7 +21,7 @@ module.exports = {
 
     if (!scheduleConfig?.board_channel_id) {
       throw new ServiceError(
-        "Schedule board channel is not configured. Please use /setscheduleboard first.",
+        "ยังไม่ได้ตั้งค่าช่องบอร์ดตารางเวลา กรุณาใช้ /setscheduleboard ก่อน",
         "SCHEDULE_BOARD_NOT_CONFIGURED",
         { guildId: interaction.guildId }
       )
@@ -31,14 +31,14 @@ module.exports = {
 
     if (!message) {
       throw new ServiceError(
-        "Could not refresh the schedule board. Please check the configured board channel.",
+        "ไม่สามารถรีเฟรชบอร์ดตารางเวลาได้ กรุณาตรวจสอบช่องบอร์ดที่ตั้งค่าไว้",
         "SCHEDULE_BOARD_REFRESH_FAILED",
         { guildId: interaction.guildId, boardChannelId: scheduleConfig.board_channel_id }
       )
     }
 
     await interaction.editReply({
-      content: `Schedule board refreshed in <#${scheduleConfig.board_channel_id}>.`
+      content: `รีเฟรชบอร์ดตารางเวลาใน <#${scheduleConfig.board_channel_id}> แล้ว`
     })
   }
 }

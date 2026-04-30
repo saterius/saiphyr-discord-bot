@@ -9,11 +9,11 @@ const { setVoiceLobby } = require("../services/guildConfigService");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("setlobby")
-    .setDescription("Set the voice lobby channel for this guild")
+    .setDescription("ตั้งช่องเสียงล็อบบี้ของเซิร์ฟเวอร์นี้")
     .addChannelOption(option =>
       option
         .setName("channel")
-        .setDescription("Lobby voice channel")
+        .setDescription("ช่องเสียงสำหรับล็อบบี้")
         .addChannelTypes(ChannelType.GuildVoice)
         .setRequired(true)
     )
@@ -28,7 +28,7 @@ module.exports = {
     });
 
     await interaction.reply({
-      content: `Lobby saved for this guild: ${channel}`,
+      content: `บันทึกช่องเสียงล็อบบี้ของเซิร์ฟเวอร์นี้แล้ว: ${channel}`,
       flags: MessageFlags.Ephemeral
     });
   }

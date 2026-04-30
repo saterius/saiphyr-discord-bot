@@ -91,7 +91,7 @@ module.exports = {
 
       if (!scheduleConfig?.board_channel_id) {
         throw new ServiceError(
-          "ยังไม่ได้เลือกแชนแนลสำหรับช่องตารางเวลา โปรดแจ้งผู้ดูแลให้ตั้งค่า /setscheduleboard ก่อน",
+          "ยังไม่ได้เลือกแชนแนลสำหรับบอร์ดตารางเวลา โปรดแจ้งผู้ดูแลให้ตั้งค่า /setscheduleboard ก่อน",
           "SCHEDULE_BOARD_NOT_CONFIGURED",
           { guildId: interaction.guildId }
         )
@@ -119,7 +119,7 @@ module.exports = {
       })
 
       const voteMessage = await interaction.channel.send({
-        content: party.party_role_id ? `<@&${party.party_role_id}>` : `Party ${party.name}`,
+        content: party.party_role_id ? `<@&${party.party_role_id}>` : `ปาร์ตี้ ${party.name}`,
         embeds: [buildScheduleEmbed(event, party)],
         components: buildScheduleActionRows(event)
       })
@@ -167,7 +167,7 @@ module.exports = {
       const oldMessageId = event.vote_message_id
 
       const voteMessage = await repostChannel.send({
-        content: party.party_role_id ? `<@&${party.party_role_id}>` : `Party ${party.name}`,
+        content: party.party_role_id ? `<@&${party.party_role_id}>` : `ปาร์ตี้ ${party.name}`,
         embeds: [buildScheduleEmbed(event, party)],
         components: buildScheduleActionRows(event)
       })
@@ -198,7 +198,7 @@ module.exports = {
     if (subcommand === "cancel") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral })
 
-      const reason = interaction.options.getString("reason") || "Cancelled manually."
+      const reason = interaction.options.getString("reason") || "ยกเลิกด้วยตนเอง"
       const party = await resolvePartyFromChannel(interaction)
       const event = await scheduleService.getCancelableScheduleEventForParty(party.id)
 

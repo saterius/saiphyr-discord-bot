@@ -9,11 +9,11 @@ const { setPartyFinderChannel } = require("../services/guildConfigService");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("setpartyfinderchannel")
-    .setDescription("Set the text channel used for /party create in this guild")
+    .setDescription("ตั้งช่องข้อความสำหรับใช้ /party create ในเซิร์ฟเวอร์นี้")
     .addChannelOption(option =>
       option
         .setName("channel")
-        .setDescription("Text channel used for party recruitment")
+        .setDescription("ช่องข้อความสำหรับโพสต์รับสมาชิกปาร์ตี้")
         .addChannelTypes(ChannelType.GuildText)
         .setRequired(true)
     )
@@ -28,7 +28,7 @@ module.exports = {
     });
 
     await interaction.reply({
-      content: `Default party finder channel saved for this guild: ${channel}`,
+      content: `บันทึกช่องรับสมาชิกปาร์ตี้ของเซิร์ฟเวอร์นี้แล้ว: ${channel}`,
       flags: MessageFlags.Ephemeral
     });
   }

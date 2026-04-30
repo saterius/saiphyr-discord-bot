@@ -8,11 +8,11 @@ const { setPartyAdminRole } = require("../services/guildConfigService")
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("setpartyadminrole")
-    .setDescription("Set the role allowed to bypass party leader/creator checks")
+    .setDescription("ตั้งยศที่สามารถจัดการปาร์ตี้และตารางเวลาแทนหัวหน้าได้")
     .addRoleOption((option) =>
       option
         .setName("role")
-        .setDescription("Role that can manage parties and schedules like an admin")
+        .setDescription("ยศที่จัดการปาร์ตี้และตารางเวลาได้เหมือนแอดมิน")
         .setRequired(true)
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -26,7 +26,7 @@ module.exports = {
     })
 
     await interaction.reply({
-      content: `Party admin role saved for this guild: ${role}`,
+      content: `บันทึกยศแอดมินปาร์ตี้สำหรับเซิร์ฟเวอร์นี้แล้ว: ${role}`,
       flags: MessageFlags.Ephemeral
     })
   }

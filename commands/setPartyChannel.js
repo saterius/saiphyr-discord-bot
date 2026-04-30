@@ -9,11 +9,11 @@ const { setPartyChannelCategory } = require("../services/guildConfigService");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("setpartychannel")
-    .setDescription("Set the category used for new party text channels")
+    .setDescription("ตั้งหมวดหมู่สำหรับสร้างห้องข้อความปาร์ตี้ใหม่")
     .addChannelOption(option =>
       option
         .setName("category")
-        .setDescription("Category where party channels should be created")
+        .setDescription("หมวดหมู่ที่จะให้ระบบสร้างห้องปาร์ตี้")
         .addChannelTypes(ChannelType.GuildCategory)
         .setRequired(true)
     )
@@ -28,7 +28,7 @@ module.exports = {
     });
 
     await interaction.reply({
-      content: `Default party channel category saved for this guild: ${category}`,
+      content: `บันทึกหมวดหมู่ห้องปาร์ตี้ของเซิร์ฟเวอร์นี้แล้ว: ${category}`,
       flags: MessageFlags.Ephemeral
     });
   }
