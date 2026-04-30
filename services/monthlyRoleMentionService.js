@@ -6,10 +6,10 @@ const MONTHLY_MENTION_TIME_ZONE = "Asia/Bangkok"
 const MONTHLY_MENTION_START_HOUR = 14
 const MONTHLY_MENTION_START_MINUTE = 0
 const MONTHLY_MENTION_END_MINUTE = 10
-const MONTHLY_MENTION_GUILD_ID = "239981427809189888"
 const MONTHLY_MENTION_CHANNEL_ID = "239981427809189888"
 const MONTHLY_MENTION_ROLE_ID = "863400503089430528"
 const STATE_FILE_PATH = path.join(__dirname, "..", "data", "monthly-role-mention-state.json")
+const MONTHLY_MENTION_GUILD_IDS_INDEX = 0
 
 let monthlyMentionInterval = null
 let monthlyMentionRunning = false
@@ -25,6 +25,17 @@ const bangkokFormatter = new Intl.DateTimeFormat("en-CA", {
   minute: "2-digit",
   hourCycle: "h23"
 })
+
+function getGuildIdsFromEnv() {
+  return String(process.env.GUILD_IDS || "")
+    .split(",")
+    .map((guildId) => guildId.trim())
+    .filter(Boolean)
+}
+
+function getMonthlyMentionGuildId() {
+  return process.env.MONTHLY_MENTION_GUILD_ID || getGuildIdsFromEnv()[MONTHLY_MENTION_GUILD_IDS_INDEX] || null
+}
 
 function getBangkokDateParts(date = new Date()) {
   const parts = Object.fromEntries(
@@ -99,8 +110,13 @@ async function processMonthlyRoleMention(client, date = new Date()) {
   monthlyMentionRunning = true
 
   try {
-    const guild = client.guilds.cache.get(MONTHLY_MENTION_GUILD_ID)
-      || await client.guilds.fetch(MONTHLY_MENTION_GUILD_ID).catch(() => null)
+    const guildId = getMonthlyMentionGuildId()
+    if (!guildId) {
+      return { skipped: true, reason: "guild_id_not_configured" }
+    }
+
+    const guild = client.guilds.cache.get(guildId)
+      || await client.guilds.fetch(guildId).catch(() => null)
 
     if (!guild) {
       return { skipped: true, reason: "guild_not_found" }

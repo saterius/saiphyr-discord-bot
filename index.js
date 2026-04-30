@@ -6,6 +6,7 @@ const loadCommands = require("./utils/commandLoader")
 const loadEvents = require("./utils/eventLoader")
 const deployCommands = require("./utils/deployCommands")
 const { startDailyPartyRecruitmentRepostLoop } = require("./services/partyRecruitmentRepostService")
+const { startLuckyZoneDungeonLoop } = require("./services/luckyZoneDungeonService")
 const { startScheduleReminderLoop } = require("./services/scheduleReminderService")
 const { startMonthlyRoleMentionLoop } = require("./services/monthlyRoleMentionService")
 
@@ -31,6 +32,7 @@ client.once("clientReady", async () => {
   startScheduleReminderLoop(client)
   startDailyPartyRecruitmentRepostLoop(client)
   startMonthlyRoleMentionLoop(client)
+  startLuckyZoneDungeonLoop(client)
 })
 
 async function shutdown(signal) {
