@@ -4,3 +4,8 @@ logs
 *.log
 *.db
 cookies.txt
+party-guide-message.txt
+schedule-guide-message.txt
+send-party-guide.js
+send-schedule-guide.js
+scripts/
