@@ -19,6 +19,7 @@ const CELL_HEIGHT = 86
 const DAY_WIDTH = 420
 const TIME_WIDTH = 176
 const UNSCHEDULED_WIDTH = 420
+const LEGEND_HEIGHT = 58
 const HEADER_HEIGHT = 80
 const WEEK_LABEL_HEIGHT = 68
 const PADDING = 28
@@ -132,6 +133,13 @@ function getCurrentScheduleBoardRange(nowUnix = Math.floor(Date.now() / 1000)) {
   return {
     rangeStartUnix,
     rangeEndUnix
+  }
+}
+
+function expandScheduleBoardRange(range = getCurrentScheduleBoardRange(), weekCount = 2) {
+  return {
+    rangeStartUnix: range.rangeStartUnix,
+    rangeEndUnix: range.rangeStartUnix + (Math.max(1, weekCount) * 7 * DAY_SECONDS)
   }
 }
 
@@ -471,6 +479,30 @@ function buildRollingSection(entries, range = getCurrentScheduleBoardRange()) {
   }
 }
 
+function buildWeeklySections(entries, range = getCurrentScheduleBoardRange()) {
+  const totalDays = Math.max(7, Math.ceil((range.rangeEndUnix - range.rangeStartUnix) / DAY_SECONDS))
+  const weekCount = Math.max(1, Math.ceil(totalDays / 7))
+  const sections = []
+
+  for (let weekIndex = 0; weekIndex < weekCount; weekIndex += 1) {
+    const rangeStartUnix = range.rangeStartUnix + (weekIndex * 7 * DAY_SECONDS)
+    const rangeEndUnix = Math.min(range.rangeEndUnix, rangeStartUnix + (7 * DAY_SECONDS))
+
+    sections.push(buildRollingSection(entries, {
+      rangeStartUnix,
+      rangeEndUnix
+    }))
+  }
+
+  return sections
+}
+
+function sortUnscheduledParties(unscheduledParties) {
+  return Array.isArray(unscheduledParties)
+    ? [...unscheduledParties].sort((a, b) => Number(a.id || 0) - Number(b.id || 0))
+    : null
+}
+
 function tryReadFont(paths) {
   for (const fontPath of paths) {
     if (!fs.existsSync(fontPath)) {
@@ -667,12 +699,71 @@ function renderUnscheduledSidebar(parts, section, layout) {
   }
 }
 
+function renderStatusLegend(parts, layout) {
+  const { x, y, width } = layout
+  const items = [
+    {
+      label: "\u0e40\u0e2a\u0e23\u0e47\u0e08\u0e2a\u0e34\u0e49\u0e19\u0e41\u0e25\u0e49\u0e27",
+      fill: COLORS.completedCard,
+      stroke: COLORS.completedCardStroke
+    },
+    {
+      label: "\u0e01\u0e33\u0e25\u0e31\u0e07\u0e42\u0e2b\u0e27\u0e15",
+      fill: COLORS.reservedCard,
+      stroke: COLORS.reservedCardStroke
+    },
+    {
+      label: "\u0e25\u0e47\u0e2d\u0e01\u0e40\u0e27\u0e25\u0e32\u0e41\u0e25\u0e49\u0e27",
+      fill: COLORS.card,
+      stroke: COLORS.cardStroke
+    }
+  ]
+  const fontFamily = `'${FONT_FAMILY}', Tahoma, sans-serif`
+  const itemWidth = 270
+  const itemGap = 26
+  const totalWidth = (items.length * itemWidth) + ((items.length - 1) * itemGap)
+  let itemX = x + Math.max(18, width - totalWidth - 24)
+
+  parts.push(`
+    <rect x="${x}" y="${y}" width="${width}" height="${LEGEND_HEIGHT}" rx="18" fill="${COLORS.panel}" />
+    <rect x="${x}" y="${y + LEGEND_HEIGHT - 18}" width="${width}" height="18" fill="${COLORS.panel}" />
+    <text
+      x="${x + 24}"
+      y="${y + 37}"
+      fill="${COLORS.muted}"
+      font-family="${fontFamily}"
+      font-size="22"
+      font-weight="700"
+      text-anchor="start"
+    >${escapeXml("\u0e04\u0e33\u0e2d\u0e18\u0e34\u0e1a\u0e32\u0e22\u0e2a\u0e35")}</text>
+  `)
+
+  items.forEach((item) => {
+    parts.push(`
+      <rect x="${itemX}" y="${y + 16}" width="28" height="28" rx="6" fill="${item.fill}" stroke="${item.stroke}" stroke-width="2" />
+      <text
+        x="${itemX + 40}"
+        y="${y + 38}"
+        fill="${COLORS.text}"
+        font-family="${fontFamily}"
+        font-size="22"
+        font-weight="700"
+        text-anchor="start"
+      >${escapeXml(item.label)}</text>
+    `)
+    itemX += itemWidth + itemGap
+  })
+}
+
 function buildSvg(section) {
   const hasUnscheduledSidebar = Array.isArray(section.unscheduledParties)
   const width = PADDING * 2 + TIME_WIDTH + (DAY_WIDTH * 7) + (hasUnscheduledSidebar ? UNSCHEDULED_GAP + UNSCHEDULED_WIDTH : 0)
-  const height = PADDING * 2 + HEADER_HEIGHT + WEEK_LABEL_HEIGHT + (section.slots.length * CELL_HEIGHT)
+  const height = PADDING * 2 + LEGEND_HEIGHT + HEADER_HEIGHT + WEEK_LABEL_HEIGHT + (section.slots.length * CELL_HEIGHT)
   const gridX = PADDING + TIME_WIDTH
-  const gridY = PADDING + HEADER_HEIGHT + WEEK_LABEL_HEIGHT
+  const headerY = PADDING + LEGEND_HEIGHT
+  const weekLabelY = headerY + HEADER_HEIGHT
+  const gridY = weekLabelY + WEEK_LABEL_HEIGHT
+  const tableBottomY = height - PADDING
   const sectionWidth = TIME_WIDTH + (DAY_WIDTH * 7)
   const parts = []
 
@@ -685,14 +776,23 @@ function buildSvg(section) {
       </defs>
       <rect width="${width}" height="${height}" rx="18" fill="${COLORS.background}" />
       <rect x="${PADDING}" y="${PADDING}" width="${sectionWidth}" height="${height - (PADDING * 2)}" rx="18" fill="${COLORS.panel}" />
-      <rect x="${PADDING}" y="${PADDING}" width="${sectionWidth}" height="${HEADER_HEIGHT}" rx="18" fill="${COLORS.header}" />
-      <rect x="${PADDING}" y="${PADDING + HEADER_HEIGHT - 18}" width="${sectionWidth}" height="18" fill="${COLORS.header}" />
+  `)
+
+  renderStatusLegend(parts, {
+    x: PADDING,
+    y: PADDING,
+    width: sectionWidth
+  })
+
+  parts.push(`
+      <rect x="${PADDING}" y="${headerY}" width="${sectionWidth}" height="${HEADER_HEIGHT}" rx="18" fill="${COLORS.header}" />
+      <rect x="${PADDING}" y="${headerY + HEADER_HEIGHT - 18}" width="${sectionWidth}" height="18" fill="${COLORS.header}" />
   `)
 
   parts.push(createSvgText({
     text: formatThaiRangeLabel(section.rangeStartUnix, section.rangeEndUnix),
     x: PADDING,
-    y: PADDING,
+    y: headerY,
     width: sectionWidth,
     height: HEADER_HEIGHT,
     fontSize: 40,
@@ -701,16 +801,16 @@ function buildSvg(section) {
   }))
 
   parts.push(`
-    <rect x="${PADDING}" y="${PADDING + HEADER_HEIGHT}" width="${sectionWidth}" height="${WEEK_LABEL_HEIGHT}" fill="${COLORS.panel}" />
-    <line x1="${PADDING}" y1="${PADDING + HEADER_HEIGHT}" x2="${PADDING + sectionWidth}" y2="${PADDING + HEADER_HEIGHT}" stroke="${COLORS.grid}" stroke-width="2" />
-    <line x1="${PADDING}" y1="${PADDING + HEADER_HEIGHT + WEEK_LABEL_HEIGHT}" x2="${PADDING + sectionWidth}" y2="${PADDING + HEADER_HEIGHT + WEEK_LABEL_HEIGHT}" stroke="${COLORS.grid}" stroke-width="2" />
-    <line x1="${PADDING + TIME_WIDTH}" y1="${PADDING + HEADER_HEIGHT}" x2="${PADDING + TIME_WIDTH}" y2="${height - PADDING}" stroke="${COLORS.grid}" stroke-width="2" />
+    <rect x="${PADDING}" y="${weekLabelY}" width="${sectionWidth}" height="${WEEK_LABEL_HEIGHT}" fill="${COLORS.panel}" />
+    <line x1="${PADDING}" y1="${weekLabelY}" x2="${PADDING + sectionWidth}" y2="${weekLabelY}" stroke="${COLORS.grid}" stroke-width="2" />
+    <line x1="${PADDING}" y1="${gridY}" x2="${PADDING + sectionWidth}" y2="${gridY}" stroke="${COLORS.grid}" stroke-width="2" />
+    <line x1="${PADDING + TIME_WIDTH}" y1="${weekLabelY}" x2="${PADDING + TIME_WIDTH}" y2="${tableBottomY}" stroke="${COLORS.grid}" stroke-width="2" />
   `)
 
   parts.push(createSvgText({
     text: "เวลา",
     x: PADDING,
-    y: PADDING + HEADER_HEIGHT,
+    y: weekLabelY,
     width: TIME_WIDTH,
     height: WEEK_LABEL_HEIGHT,
     fontSize: 32,
@@ -722,12 +822,12 @@ function buildSvg(section) {
     const dayUnix = section.rangeStartUnix + (dayIndex * DAY_SECONDS)
     const dayX = gridX + (dayIndex * DAY_WIDTH)
     parts.push(`
-      <line x1="${dayX}" y1="${PADDING + HEADER_HEIGHT}" x2="${dayX}" y2="${height - PADDING}" stroke="${COLORS.grid}" stroke-width="2" />
+      <line x1="${dayX}" y1="${weekLabelY}" x2="${dayX}" y2="${tableBottomY}" stroke="${COLORS.grid}" stroke-width="2" />
     `)
     parts.push(createSvgText({
       text: formatThaiDayLabel(dayUnix),
       x: dayX,
-      y: PADDING + HEADER_HEIGHT,
+      y: weekLabelY,
       width: DAY_WIDTH,
       height: WEEK_LABEL_HEIGHT,
       fontSize: 28,
@@ -737,7 +837,7 @@ function buildSvg(section) {
   }
 
   parts.push(`
-    <line x1="${PADDING + sectionWidth}" y1="${PADDING + HEADER_HEIGHT}" x2="${PADDING + sectionWidth}" y2="${height - PADDING}" stroke="${COLORS.grid}" stroke-width="2" />
+    <line x1="${PADDING + sectionWidth}" y1="${weekLabelY}" x2="${PADDING + sectionWidth}" y2="${tableBottomY}" stroke="${COLORS.grid}" stroke-width="2" />
   `)
 
   for (let slotIndex = 0; slotIndex < section.slots.length; slotIndex += 1) {
@@ -758,7 +858,7 @@ function buildSvg(section) {
   }
 
   parts.push(`
-    <line x1="${PADDING}" y1="${height - PADDING}" x2="${PADDING + sectionWidth}" y2="${height - PADDING}" stroke="${COLORS.grid}" stroke-width="2" />
+    <line x1="${PADDING}" y1="${tableBottomY}" x2="${PADDING + sectionWidth}" y2="${tableBottomY}" stroke="${COLORS.grid}" stroke-width="2" />
   `)
 
   section.entries.forEach((entry, index) => {
@@ -828,24 +928,70 @@ function buildSvg(section) {
   }
 }
 
-async function createScheduleBoardImage(entries, { range = getCurrentScheduleBoardRange(), unscheduledParties = null } = {}) {
+async function createScheduleBoardImage(entries, {
+  range = getCurrentScheduleBoardRange(),
+  unscheduledParties = null,
+  unscheduledPartiesByRange = null
+} = {}) {
   const sortedEntries = [...entries]
     .filter((entry) => Number.isFinite(entry.start_at_unix))
     .sort((a, b) => a.start_at_unix - b.start_at_unix)
-  const sortedUnscheduledParties = Array.isArray(unscheduledParties)
-    ? [...unscheduledParties].sort((a, b) => Number(a.id || 0) - Number(b.id || 0))
+  const sortedUnscheduledParties = sortUnscheduledParties(unscheduledParties)
+  const sortedUnscheduledPartiesByRange = Array.isArray(unscheduledPartiesByRange)
+    ? unscheduledPartiesByRange.map(sortUnscheduledParties)
     : null
+  const hasUnscheduledParties = sortedUnscheduledPartiesByRange
+    ? sortedUnscheduledPartiesByRange.some((parties) => parties?.length)
+    : Boolean(sortedUnscheduledParties?.length)
 
-  if (!sortedEntries.length && !sortedUnscheduledParties?.length) {
+  if (!sortedEntries.length && !hasUnscheduledParties) {
     return null
   }
 
-  const section = {
-    ...buildRollingSection(sortedEntries, range),
-    unscheduledParties: sortedUnscheduledParties
-  }
-  const { svg } = buildSvg(section)
-  const buffer = await sharp(Buffer.from(svg)).png().toBuffer()
+  const sections = buildWeeklySections(sortedEntries, range)
+  const renderedSections = await Promise.all(sections.map(async (section, index) => {
+    const sectionUnscheduledParties = sortedUnscheduledPartiesByRange
+      ? sortedUnscheduledPartiesByRange[index] || []
+      : sortedUnscheduledParties
+    const { svg, width, height } = buildSvg({
+      ...section,
+      unscheduledParties: sectionUnscheduledParties
+    })
+
+    return {
+      buffer: await sharp(Buffer.from(svg)).png().toBuffer(),
+      width,
+      height
+    }
+  }))
+
+  const sectionGap = sections.length > 1 ? 24 : 0
+  const width = Math.max(...renderedSections.map((section) => section.width))
+  const height = renderedSections.reduce((total, section) => total + section.height, 0)
+    + (sectionGap * Math.max(0, renderedSections.length - 1))
+  let top = 0
+  const composites = renderedSections.map((section) => {
+    const composite = {
+      input: section.buffer,
+      left: Math.floor((width - section.width) / 2),
+      top
+    }
+    top += section.height + sectionGap
+    return composite
+  })
+  const buffer = renderedSections.length === 1
+    ? renderedSections[0].buffer
+    : await sharp({
+      create: {
+        width,
+        height,
+        channels: 4,
+        background: COLORS.background
+      }
+    })
+      .composite(composites)
+      .png()
+      .toBuffer()
 
   return {
     buffer,
@@ -855,6 +1001,7 @@ async function createScheduleBoardImage(entries, { range = getCurrentScheduleBoa
 
 module.exports = {
   createScheduleBoardImage,
+  expandScheduleBoardRange,
   filterScheduleBoardEntriesForRange,
   getCurrentScheduleBoardRange,
   isScheduleBoardEntryInRange
