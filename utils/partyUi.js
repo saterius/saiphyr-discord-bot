@@ -565,9 +565,7 @@ function buildScheduleBoardOverviewEmbeds(entries, guildId, { boardRange = null 
         : null
       const jumpLine = voteJumpUrl ? `\nดูข้อความโหวต: [Jump ไปยังโพสต์](${voteJumpUrl})` : ""
       const lines = [
-        `สถานะ: ${scheduleStatusLabel(entry.status)}`,
         `เวลาลง: ${renderScheduleWindow(entry)}`,
-        `หัวหน้าปาร์ตี้: <@${entry.leader_id}>`,
         `ยศปาร์ตี้: ${roleMention}`,
         `ห้องปาร์ตี้: ${partyRoom}`
       ]

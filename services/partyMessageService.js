@@ -291,9 +291,9 @@ async function syncGuildScheduleBoard(client, guildId, explicitBoardChannelId = 
     scheduleService.listGuildUnscheduledScheduleBoardParties(guildId, currentWeekRange),
     scheduleService.listGuildUnscheduledScheduleBoardParties(guildId, nextWeekRange)
   ])
-  const visibleEntries = filterScheduleBoardEntriesForRange(entries, boardRange)
+  const visibleEntries = filterScheduleBoardEntriesForRange(entries, currentWeekRange)
   const visibleImageEntries = filterScheduleBoardEntriesForRange(imageEntries, boardRange)
-  const embeds = buildScheduleBoardOverviewEmbeds(visibleEntries, guildId, { boardRange })
+  const embeds = buildScheduleBoardOverviewEmbeds(visibleEntries, guildId, { boardRange: currentWeekRange })
   const boardImage = await createScheduleBoardImage(visibleImageEntries, {
     range: boardRange,
     unscheduledPartiesByRange
