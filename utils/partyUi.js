@@ -664,7 +664,9 @@ function buildPartyPlannedTimeNotice(party) {
     return null
   }
 
-  return `เวลานัดลง: ${renderPartyPlannedTime(party)}`
+  const roleMention = party.party_role_id ? `<@&${party.party_role_id}> ` : ""
+
+  return `${roleMention}เวลานัดลง: ${renderPartyPlannedTime(party)}`
 }
 
 function buildScheduleLockedNotice(event, party = null) {

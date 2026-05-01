@@ -206,7 +206,10 @@ async function provisionPartyAndAnnounce(client, partyId) {
     const plannedTimeNotice = buildPartyPlannedTimeNotice(provisioned.party)
     if (plannedTimeNotice) {
       await provisioned.channel.send({
-        content: plannedTimeNotice
+        content: plannedTimeNotice,
+        allowedMentions: provisioned.party.party_role_id
+          ? { roles: [provisioned.party.party_role_id] }
+          : undefined
       }).catch(() => null)
     }
   }
