@@ -247,7 +247,9 @@ function formatMember(member) {
 function buildPartyEmbed(party) {
   const activeCount = Number(party.active_member_count || 0)
   const maxMembers = Number(party.max_members || 0)
-  const visibleMembers = (party.members || []).filter((member) => member.join_status !== MEMBER_STATUS.LEFT)
+  const visibleMembers = (party.members || []).filter((member) => (
+    [MEMBER_STATUS.JOINED, MEMBER_STATUS.CONFIRMED].includes(member.join_status)
+  ))
   const memberLines = visibleMembers.length
     ? visibleMembers.map(formatMember).join("\n")
     : "ยังไม่มีสมาชิก"
