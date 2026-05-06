@@ -1,5 +1,35 @@
 const db = require("./client")
 
+const TRANSIENT_QUERY_RETRY_COUNT = 3
+const TRANSIENT_QUERY_RETRY_BASE_DELAY_MS = 250
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function getErrorText(error) {
+  return [
+    error?.message,
+    error?.cause?.message,
+    error?.cause?.proto?.message,
+    error?.code,
+    error?.cause?.code
+  ]
+    .filter(Boolean)
+    .join(" ")
+}
+
+function isTransientLibsqlError(error) {
+  if (error?.code !== "SQLITE_UNKNOWN" && error?.cause?.code !== "SQLITE_UNKNOWN") {
+    return false
+  }
+
+  const errorText = getErrorText(error)
+  return /S3 error/i.test(errorText)
+    || /\b503\b/.test(errorText)
+    || /failed to list objects/i.test(errorText)
+}
+
 function normalizeValue(value) {
   if (typeof value === "bigint") {
     const asNumber = Number(value)
@@ -17,7 +47,21 @@ function mapRow(result, row) {
 }
 
 async function query(executor, sql, args = []) {
-  return executor.execute({ sql, args })
+  for (let attempt = 0; attempt <= TRANSIENT_QUERY_RETRY_COUNT; attempt += 1) {
+    try {
+      return await executor.execute({ sql, args })
+    } catch (error) {
+      if (!isTransientLibsqlError(error) || attempt === TRANSIENT_QUERY_RETRY_COUNT) {
+        throw error
+      }
+
+      const delayMs = TRANSIENT_QUERY_RETRY_BASE_DELAY_MS * (2 ** attempt)
+      console.warn(
+        `Transient libSQL query error, retrying in ${delayMs}ms (${attempt + 1}/${TRANSIENT_QUERY_RETRY_COUNT}).`
+      )
+      await wait(delayMs)
+    }
+  }
 }
 
 async function getOne(executor, sql, args = []) {
@@ -66,6 +110,7 @@ module.exports = {
   db,
   getMany,
   getOne,
+  isTransientLibsqlError,
   query,
   run,
   withTransaction
