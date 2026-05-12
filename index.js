@@ -10,6 +10,8 @@ const { startLuckyZoneDungeonLoop } = require("./services/luckyZoneDungeonServic
 const { startScheduleReminderLoop } = require("./services/scheduleReminderService")
 const { startMonthlyRoleMentionLoop } = require("./services/monthlyRoleMentionService")
 
+const LUCKY_ZONE_DUNGEON_ENABLED = false
+
 const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
   intents: [
@@ -32,7 +34,12 @@ client.once("clientReady", async () => {
   startScheduleReminderLoop(client)
   startDailyPartyRecruitmentRepostLoop(client)
   startMonthlyRoleMentionLoop(client)
-  startLuckyZoneDungeonLoop(client)
+
+  if (LUCKY_ZONE_DUNGEON_ENABLED) {
+    startLuckyZoneDungeonLoop(client)
+  } else {
+    console.log("Lucky Zone Dungeon loop is temporarily disabled for the patch 60 update.")
+  }
 })
 
 async function shutdown(signal) {
