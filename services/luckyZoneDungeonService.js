@@ -188,6 +188,14 @@ function formatDiscordDate(entry) {
   return `<t:${entry.unix}:D>`
 }
 
+function formatLuckyZoneDungeonName(dungeon) {
+  if (dungeon === "Meteor Crash Site Core") {
+    return `${dungeon} (ดันแย่)`
+  }
+
+  return dungeon
+}
+
 function buildLuckyZoneDungeonMessage(date = new Date()) {
   const today = getLuckyZoneDungeonForDate(date)
   const tomorrow = getLuckyZoneDungeonForDate(new Date(date.getTime() + 24 * 60 * 60 * 1000))
@@ -206,10 +214,10 @@ function buildLuckyZoneDungeonMessage(date = new Date()) {
   return [
     "**Lucky Zone Dungeon วันนี้ / พรุ่งนี้**",
     `วันนี้ (${formatDiscordDate(today)}) - Pattern ${today.pattern}`,
-    `Lucky Zone: ${today.luckyZone}`,
+    `Lucky Zone: ${formatLuckyZoneDungeonName(today.luckyZone)}`,
     "",
     `พรุ่งนี้ (${formatDiscordDate(tomorrow)}) - Pattern ${tomorrow.pattern}`,
-    `Lucky Zone: ${tomorrow.luckyZone}`
+    `Lucky Zone: ${formatLuckyZoneDungeonName(tomorrow.luckyZone)}`
   ].join("\n")
 }
 
