@@ -10,109 +10,110 @@ const LUCKY_ZONE_CHANNEL_ID = process.env.LUCKY_ZONE_CHANNEL_ID || "123157481248
 const STATE_FILE_PATH = path.join(__dirname, "..", "data", "lucky-zone-dungeon-state.json")
 const LUCKY_ZONE_GUILD_IDS_INDEX = 2
 
+// Patch 60 currently has one Lucky Zone dungeon. May 2026 is pattern 2.
 const ANCHOR_YEAR = 2026
-const ANCHOR_MONTH = 4
-const ANCHOR_PATTERN_INDEX = 2
+const ANCHOR_MONTH = 5
+const ANCHOR_PATTERN_INDEX = 1
 
 const LUCKY_ZONE_PATTERNS = [
   [
-    ["Riverwort Village Ruins", "Ancient Treasure Warehouse"],
-    ["West Ancient Armory", "Floating Island Beach"],
-    ["Dragon Follower Base", "Closed Ice Valley"],
-    ["Ancient Library", "Isla Native Village"],
-    ["East Ancient Armory", "Valley of Blindness"],
-    ["West Ancient Armory", "Queen's Garden"],
-    ["Riverwort Village Ruins", "Floating Island Core"],
-    ["Dragon Follower Base", "Isla Native Village"],
-    ["Ancient Library", "Closed Ice Valley"],
-    ["East Ancient Armory", "Ancient Treasure Warehouse"],
-    ["West Ancient Armory", "Floating Island Core"],
-    ["Riverwort Village Ruins", "Valley of Blindness"],
-    ["Dragon Follower Base", "Queen's Garden"],
-    ["Ancient Library", "Floating Island Beach"],
-    ["East Ancient Armory", "Closed Ice Valley"],
-    ["West Ancient Armory", "Isla Native Village"],
-    ["Riverwort Village Ruins", "Queen's Garden"],
-    ["Dragon Follower Base", "Floating Island Beach"],
-    ["Ancient Library", "Valley of Blindness"],
-    ["East Ancient Armory", "Floating Island Core"],
-    ["West Ancient Armory", "Ancient Treasure Warehouse"],
-    ["Riverwort Village Ruins", "Closed Ice Valley"],
-    ["Dragon Follower Base", "Valley of Blindness"],
-    ["Ancient Library", "Queen's Garden"],
-    ["East Ancient Armory", "Isla Native Village"],
-    ["West Ancient Armory", "Closed Ice Valley"],
-    ["Riverwort Village Ruins", "Floating Island Beach"],
-    ["Dragon Follower Base", "Ancient Treasure Warehouse"],
-    ["Ancient Library", "Floating Island Core"],
-    ["East Ancient Armory", "Floating Island Beach"],
-    ["West Ancient Armory", "Valley of Blindness"]
+    "Meteor Crash Site Boundaries",
+    "Encroached Temple Ruins",
+    "Mutant's Habitat",
+    "Shadow of Evil Spirits",
+    "Meteor Crash Site Core",
+    "Mutant's Habitat",
+    "Meteor Crash Site Boundaries",
+    "Encroached Temple Ruins",
+    "Meteor Crash Site Core",
+    "Shadow of Evil Spirits",
+    "Meteor Crash Site Boundaries",
+    "Meteor Crash Site Core",
+    "Mutant's Habitat",
+    "Shadow of Evil Spirits",
+    "Encroached Temple Ruins",
+    "Mutant's Habitat",
+    "Shadow of Evil Spirits",
+    "Meteor Crash Site Core",
+    "Meteor Crash Site Boundaries",
+    "Encroached Temple Ruins",
+    "Meteor Crash Site Core",
+    "Mutant's Habitat",
+    "Encroached Temple Ruins",
+    "Meteor Crash Site Boundaries",
+    "Shadow of Evil Spirits",
+    "Encroached Temple Ruins",
+    "Mutant's Habitat",
+    "Meteor Crash Site Core",
+    "Shadow of Evil Spirits",
+    "Meteor Crash Site Boundaries",
+    "Mutant's Habitat"
   ],
   [
-    ["Riverwort Village Ruins", "Isla Native Village"],
-    ["East Ancient Armory", "Closed Ice Valley"],
-    ["Ancient Library", "Valley of Blindness"],
-    ["West Ancient Armory", "Queen's Garden"],
-    ["Dragon Follower Base", "Floating Island Core"],
-    ["West Ancient Armory", "Floating Island Beach"],
-    ["Ancient Library", "Floating Island Core"],
-    ["East Ancient Armory", "Ancient Treasure Warehouse"],
-    ["Dragon Follower Base", "Queen's Garden"],
-    ["Ancient Library", "Closed Ice Valley"],
-    ["Riverwort Village Ruins", "Floating Island Beach"],
-    ["West Ancient Armory", "Isla Native Village"],
-    ["Ancient Library", "Ancient Treasure Warehouse"],
-    ["Riverwort Village Ruins", "Valley of Blindness"],
-    ["Dragon Follower Base", "Closed Ice Valley"],
-    ["East Ancient Armory", "Floating Island Core"],
-    ["Dragon Follower Base", "Valley of Blindness"],
-    ["West Ancient Armory", "Closed Ice Valley"],
-    ["East Ancient Armory", "Floating Island Beach"],
-    ["West Ancient Armory", "Floating Island Core"],
-    ["Ancient Library", "Queen's Garden"],
-    ["Riverwort Village Ruins", "Ancient Treasure Warehouse"],
-    ["East Ancient Armory", "Isla Native Village"],
-    ["Ancient Library", "Floating Island Beach"],
-    ["Dragon Follower Base", "Isla Native Village"],
-    ["West Ancient Armory", "Valley of Blindness"],
-    ["East Ancient Armory", "Queen's Garden"],
-    ["Riverwort Village Ruins", "Closed Ice Valley"],
-    ["Dragon Follower Base", "Ancient Treasure Warehouse"],
-    ["Riverwort Village Ruins", "Floating Island Core"],
-    ["West Ancient Armory", "Ancient Treasure Warehouse"]
+    "Meteor Crash Site Core",
+    "Shadow of Evil Spirits",
+    "Mutant's Habitat",
+    "Encroached Temple Ruins",
+    "Meteor Crash Site Boundaries",
+    "Meteor Crash Site Core",
+    "Shadow of Evil Spirits",
+    "Encroached Temple Ruins",
+    "Mutant's Habitat",
+    "Meteor Crash Site Boundaries",
+    "Shadow of Evil Spirits",
+    "Meteor Crash Site Core",
+    "Encroached Temple Ruins",
+    "Meteor Crash Site Boundaries",
+    "Mutant's Habitat",
+    "Shadow of Evil Spirits",
+    "Meteor Crash Site Boundaries",
+    "Encroached Temple Ruins",
+    "Meteor Crash Site Core",
+    "Mutant's Habitat",
+    "Shadow of Evil Spirits",
+    "Meteor Crash Site Boundaries",
+    "Meteor Crash Site Core",
+    "Encroached Temple Ruins",
+    "Shadow of Evil Spirits",
+    "Mutant's Habitat",
+    "Meteor Crash Site Boundaries",
+    "Encroached Temple Ruins",
+    "Meteor Crash Site Core",
+    "Mutant's Habitat",
+    "Shadow of Evil Spirits"
   ],
   [
-    ["Ancient Library", "Queen's Garden"],
-    ["East Ancient Armory", "Closed Ice Valley"],
-    ["West Ancient Armory", "Ancient Treasure Warehouse"],
-    ["Riverwort Village Ruins", "Floating Island Beach"],
-    ["Dragon Follower Base", "Isla Native Village"],
-    ["Ancient Library", "Floating Island Core"],
-    ["East Ancient Armory", "Valley of Blindness"],
-    ["West Ancient Armory", "Closed Ice Valley"],
-    ["Riverwort Village Ruins", "Queen's Garden"],
-    ["Dragon Follower Base", "Ancient Treasure Warehouse"],
-    ["Ancient Library", "Floating Island Beach"],
-    ["East Ancient Armory", "Floating Island Core"],
-    ["West Ancient Armory", "Isla Native Village"],
-    ["Riverwort Village Ruins", "Valley of Blindness"],
-    ["Dragon Follower Base", "Closed Ice Valley"],
-    ["Ancient Library", "Ancient Treasure Warehouse"],
-    ["East Ancient Armory", "Floating Island Beach"],
-    ["West Ancient Armory", "Floating Island Core"],
-    ["Riverwort Village Ruins", "Isla Native Village"],
-    ["Dragon Follower Base", "Queen's Garden"],
-    ["Ancient Library", "Closed Ice Valley"],
-    ["East Ancient Armory", "Ancient Treasure Warehouse"],
-    ["West Ancient Armory", "Valley of Blindness"],
-    ["Riverwort Village Ruins", "Floating Island Core"],
-    ["Dragon Follower Base", "Floating Island Beach"],
-    ["Ancient Library", "Isla Native Village"],
-    ["East Ancient Armory", "Queen's Garden"],
-    ["West Ancient Armory", "Floating Island Beach"],
-    ["Riverwort Village Ruins", "Closed Ice Valley"],
-    ["Dragon Follower Base", "Valley of Blindness"],
-    ["West Ancient Armory", "Queen's Garden"]
+    "Meteor Crash Site Core",
+    "Meteor Crash Site Boundaries",
+    "Encroached Temple Ruins",
+    "Mutant's Habitat",
+    "Shadow of Evil Spirits",
+    "Meteor Crash Site Core",
+    "Mutant's Habitat",
+    "Encroached Temple Ruins",
+    "Meteor Crash Site Boundaries",
+    "Meteor Crash Site Core",
+    "Shadow of Evil Spirits",
+    "Mutant's Habitat",
+    "Meteor Crash Site Core",
+    "Meteor Crash Site Boundaries",
+    "Shadow of Evil Spirits",
+    "Encroached Temple Ruins",
+    "Mutant's Habitat",
+    "Meteor Crash Site Boundaries",
+    "Meteor Crash Site Core",
+    "Encroached Temple Ruins",
+    "Shadow of Evil Spirits",
+    "Meteor Crash Site Boundaries",
+    "Mutant's Habitat",
+    "Meteor Crash Site Core",
+    "Shadow of Evil Spirits",
+    "Encroached Temple Ruins",
+    "Meteor Crash Site Boundaries",
+    "Mutant's Habitat",
+    "Shadow of Evil Spirits",
+    "Meteor Crash Site Core",
+    "Encroached Temple Ruins"
   ]
 ]
 
@@ -142,10 +143,6 @@ function getLuckyZoneGuildId() {
   return process.env.LUCKY_ZONE_GUILD_ID || getGuildIdsFromEnv()[LUCKY_ZONE_GUILD_IDS_INDEX] || null
 }
 
-function mod(value, divisor) {
-  return ((value % divisor) + divisor) % divisor
-}
-
 function getBangkokDateParts(date = new Date()) {
   const parts = Object.fromEntries(
     bangkokFormatter.formatToParts(date)
@@ -164,6 +161,10 @@ function getBangkokDateParts(date = new Date()) {
   }
 }
 
+function mod(value, divisor) {
+  return ((value % divisor) + divisor) % divisor
+}
+
 function getPatternIndex(year, month) {
   const monthOffset = (year - ANCHOR_YEAR) * 12 + (month - ANCHOR_MONTH)
   return mod(ANCHOR_PATTERN_INDEX + monthOffset, LUCKY_ZONE_PATTERNS.length)
@@ -172,13 +173,14 @@ function getPatternIndex(year, month) {
 function getLuckyZoneDungeonForDate(date = new Date()) {
   const parts = getBangkokDateParts(date)
   const patternIndex = getPatternIndex(parts.year, parts.month)
-  const maps = LUCKY_ZONE_PATTERNS[patternIndex][parts.day - 1]
+  const dungeon = LUCKY_ZONE_PATTERNS[patternIndex][parts.day - 1]
 
   return {
     ...parts,
     pattern: patternIndex + 1,
-    luckyZone1: maps[0],
-    luckyZone2: maps[1]
+    // luckyZone1: maps[0],
+    // luckyZone2: maps[1]
+    luckyZone: dungeon
   }
 }
 
@@ -190,15 +192,24 @@ function buildLuckyZoneDungeonMessage(date = new Date()) {
   const today = getLuckyZoneDungeonForDate(date)
   const tomorrow = getLuckyZoneDungeonForDate(new Date(date.getTime() + 24 * 60 * 60 * 1000))
 
+  // return [
+  //   "**Lucky Zone Dungeon วันนี้ / พรุ่งนี้**",
+  //   `วันนี้ (${formatDiscordDate(today)}) - Pattern ${today.pattern}`,
+  //   `Lucky Zone 1: ${today.luckyZone1}`,
+  //   `Lucky Zone 2: ${today.luckyZone2}`,
+  //   "",
+  //   `พรุ่งนี้ (${formatDiscordDate(tomorrow)}) - Pattern ${tomorrow.pattern}`,
+  //   `Lucky Zone 1: ${tomorrow.luckyZone1}`,
+  //   `Lucky Zone 2: ${tomorrow.luckyZone2}`
+  // ].join("\n")
+
   return [
     "**Lucky Zone Dungeon วันนี้ / พรุ่งนี้**",
     `วันนี้ (${formatDiscordDate(today)}) - Pattern ${today.pattern}`,
-    `Lucky Zone 1: ${today.luckyZone1}`,
-    `Lucky Zone 2: ${today.luckyZone2}`,
+    `Lucky Zone: ${today.luckyZone}`,
     "",
     `พรุ่งนี้ (${formatDiscordDate(tomorrow)}) - Pattern ${tomorrow.pattern}`,
-    `Lucky Zone 1: ${tomorrow.luckyZone1}`,
-    `Lucky Zone 2: ${tomorrow.luckyZone2}`
+    `Lucky Zone: ${tomorrow.luckyZone}`
   ].join("\n")
 }
 
