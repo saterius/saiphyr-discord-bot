@@ -8,6 +8,7 @@
     "start": "node index.js",
     "deploy": "node utils/deployCommands.js",
     "db:init": "node db/init.js",
+    "send:message": "node scripts/send-message.js",
     "send:lucky-zone": "node scripts/send-lucky-zone-dungeon.js"
   },
   "keywords": [],
