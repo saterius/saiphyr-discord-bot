@@ -7,7 +7,8 @@
     "prestart": "node utils/deployCommands.js",
     "start": "node index.js",
     "deploy": "node utils/deployCommands.js",
-    "db:init": "node db/init.js"
+    "db:init": "node db/init.js",
+    "send:lucky-zone": "node scripts/send-lucky-zone-dungeon.js"
   },
   "keywords": [],
   "author": "",
