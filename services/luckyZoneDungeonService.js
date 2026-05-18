@@ -188,9 +188,21 @@ function formatDiscordDate(entry) {
   return `<t:${entry.unix}:D>`
 }
 
+const LUCKY_ZONE_DUNGEON_DESCRIPTIONS = {
+  "Encroached Temple Ruins": "หมึกกะพรุน",
+  "Mutant's Habitat": "ด้วง",
+  "Meteor Crash Site Boundaries": "ผีเสื้อ",
+  "Shadow of Evil Spirits": "เอเลี่ยน",
+  "Meteor Crash Site Core": "ดาร์คไนท์"
+}
+
 function formatLuckyZoneDungeonName(dungeon) {
-  if (dungeon === "Meteor Crash Site Core") {
-    return `${dungeon} (ดันแย่)`
+  const description = LUCKY_ZONE_DUNGEON_DESCRIPTIONS[dungeon]
+  if (description) {
+    if (dungeon === "Meteor Crash Site Core") {
+      return `${dungeon} (${description}) (ดันแย่)`
+    }
+    return `${dungeon} (${description})`
   }
 
   return dungeon
