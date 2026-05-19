@@ -59,6 +59,25 @@ function parseGoldExpression(expression) {
   return normalized.split("+").map((value) => Number(value))
 }
 
+function parseStampExpression(expression) {
+  const normalized = String(expression || "")
+    .replace(/\s+/g, "")
+    .replace(/,/g, "")
+
+  if (!normalized) {
+    throw new ServiceError("กรุณาใส่จำนวนสแตมป์ เช่น 9 หรือ 2+2+5", "VALIDATION_ERROR")
+  }
+
+  if (!/^\d+(?:\+\d+)*$/.test(normalized)) {
+    throw new ServiceError(
+      "รูปแบบจำนวนสแตมป์ไม่ถูกต้อง ใช้ได้เฉพาะตัวเลขคั่นด้วย + เช่น 9 หรือ 2+2+5",
+      "VALIDATION_ERROR"
+    )
+  }
+
+  return normalized.split("+").map((value) => Number(value))
+}
+
 function formatGold(value) {
   const formatted = Number(value).toLocaleString("en-US", {
     minimumFractionDigits: Number.isInteger(value) ? 0 : 1,
@@ -380,12 +399,11 @@ module.exports = {
             .setDescription("จำนวนเงินคั่นด้วยเครื่องหมาย +, เช่น 500+500+40+700")
             .setRequired(true)
         )
-        .addIntegerOption((option) =>
+        .addStringOption((option) =>
           option
             .setName("stamps")
-            .setDescription("จำนวนสแตมป์ที่ใช้")
+            .setDescription("จำนวนสแตมป์ที่ใช้ เช่น 9 หรือ 2+2+5")
             .setRequired(true)
-            .setMinValue(0)
         )
         .addIntegerOption((option) =>
           option
@@ -723,7 +741,7 @@ module.exports = {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral })
 
       const amountsInput = interaction.options.getString("amounts")
-      const stampCount = interaction.options.getInteger("stamps")
+      const stampsInput = String(interaction.options.get("stamps", true).value)
       const memberCount = interaction.options.getInteger("members")
       const calChannelConfig = await getCalChannelConfig(interaction.guildId)
 
@@ -746,9 +764,12 @@ module.exports = {
       }
 
       const amounts = parseGoldExpression(amountsInput)
+      const stamps = parseStampExpression(stampsInput)
       const grossTotal = amounts.reduce((sum, value) => sum + value, 0)
+      const stampCount = stamps.reduce((sum, value) => sum + value, 0)
       const stampCost = stampCount * 3
       const netTotal = grossTotal - stampCost
+      const stampsText = stamps.join(" + ")
 
       if (netTotal < 0) {
         throw new ServiceError(
@@ -778,7 +799,7 @@ module.exports = {
           : null,
         `สรุปยอดเงินปาร์ตี้ (${memberCount} คน)`,
         `รายการเงิน: ${amounts.join(" + ")} = ${formatGold(grossTotal)}`,
-        `ค่าสแตมป์: ${stampCount} x 3 = ${formatGold(stampCost)}`,
+        `ค่าสแตมป์: ${stamps.length > 1 ? `${stampsText} = ` : ""}${stampCount} x 3 = ${formatGold(stampCost)}`,
         `เงินหลังหักค่าสแตมป์: ${formatGold(netTotal)}`,
         `หาร ${memberCount} คน = \`${formatGold(perMember)}\` / คน`,
         stampCount > 0
